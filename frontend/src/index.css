@@ -1,0 +1,583 @@
+/* =====================================================================
+   Slack-inspired design system
+   (design-md/slack/DESIGN.md — aubergine primary, cream-lavender canvas,
+    pill buttons, Inter type, blue inline links, pastel-mesh hero)
+   ===================================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
+
+:root {
+  /* --- Slack tokens --- */
+  --primary: #4a154b; /* aubergine */
+  --primary-press: #611f69;
+  --primary-tint: #592466;
+  --on-primary: #ffffff;
+
+  --ink: #1d1d1d;
+  --ink-mute: #696969;
+  --link-blue: #1264a3;
+  --link-hover: #3860be;
+
+  --canvas: #ffffff;
+  --canvas-cream: #f4ede4;
+  --canvas-lavender: #f9f0ff;
+  --hairline: #e6e6e6;
+
+  --danger: #cc4117; /* semantic-error */
+  --success: #007a5a;
+
+  /* --- mapped app aliases (keep component classes working) --- */
+  --bg: var(--canvas-cream);
+  --surface: var(--canvas);
+  --border: var(--hairline);
+  --text: var(--ink);
+  --text-muted: var(--ink-mute);
+  --primary-hover: var(--primary-press);
+
+  --shadow: rgba(0, 0, 0, 0.1) 0 0 32px 0; /* elevation 2 — mockup composite */
+  --shadow-btn: rgba(0, 0, 0, 0.1) 0 5px 20px 0; /* elevation 1 */
+  --radius: 16px; /* rounded.xl — cards */
+  --pill: 90px; /* rounded.pill — buttons */
+
+  --font-display: "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", "Malgun Gothic",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  /* pastel-mesh gradient backdrop — peach + lavender + dusty green wash */
+  background-image:
+    radial-gradient(60% 55% at 12% 0%, #ffece0 0%, rgba(255, 236, 224, 0) 60%),
+    radial-gradient(55% 50% at 88% 4%, #f2e6ff 0%, rgba(242, 230, 255, 0) 62%),
+    radial-gradient(45% 45% at 62% 0%, #e6f3ea 0%, rgba(230, 243, 234, 0) 55%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+a {
+  color: var(--link-blue);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ---------- 레이아웃 ---------- */
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.topbar h1 {
+  font-family: var(--font-display);
+  font-size: 32px; /* display-md */
+  font-weight: 700;
+  letter-spacing: -0.256px;
+  line-height: 1.25;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* aubergine wordmark-style badge */
+.topbar .badge {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.96px; /* micro-cap */
+  border-radius: var(--pill);
+  padding: 4px 12px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: -0.0216px;
+  margin: 4px 0 24px;
+  white-space: nowrap; /* 한 줄로 표시 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 컨트롤 (pill buttons) ---------- */
+.btn {
+  border: 2px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  border-radius: var(--pill);
+  padding: 12px 28px; /* over-padded pill */
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px; /* button-md */
+  line-height: 1.38;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-btn);
+}
+.btn-primary:hover {
+  background: var(--primary-press);
+  border-color: var(--primary-press);
+  color: var(--on-primary);
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select,
+.input {
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  border-radius: 4px; /* rounded.sm — inputs */
+  padding: 10px 12px;
+  font-size: 16px;
+  font-family: var(--font-ui);
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: rgb(97, 31, 105) 0 0 0 1px inset; /* aubergine inset focus */
+}
+
+/* ---------- 키워드 매니저 ---------- */
+.keyword-manager {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+.keyword-manager h2 {
+  font-size: 12px;
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.96px;
+  text-transform: uppercase;
+}
+.keyword-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.keyword-add .input {
+  flex: 1;
+}
+.keyword-add .select {
+  flex: 0 0 auto;
+}
+.add-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.43;
+}
+/* RSS 프리셋 버튼 줄 */
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.presets-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.btn-preset {
+  padding: 8px 20px;
+  font-size: 14.4px;
+  letter-spacing: 0.144px;
+  border-style: solid;
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--canvas-lavender);
+}
+.btn-preset:hover {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  border-radius: var(--pill);
+  padding: 6px 8px 6px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+/* 칩의 이름 부분: 클릭하면 해당 채널로 스크롤 */
+.chip-label {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.chip-label:hover {
+  color: var(--primary);
+}
+.chip button:not(.chip-label) {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.chip button:not(.chip-label):hover {
+  background: var(--danger);
+  color: #fff;
+}
+.chip-rss {
+  border-color: var(--primary);
+  background: var(--canvas-lavender);
+}
+
+/* RSS 채널 필터 */
+.rss-filters {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.rss-filters h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+.rss-filters-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.filter-row-name {
+  min-width: 120px;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+.filter-row .input {
+  flex: 1;
+  min-width: 140px;
+}
+.btn-clear {
+  color: var(--danger);
+  border-color: var(--danger);
+  padding: 8px 20px;
+}
+.btn-clear:hover {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.chip-tag,
+.kw-tag {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: var(--pill);
+  padding: 2px 8px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+/* ---------- 대시보드: 키워드 접이식 패널(블럭) ---------- */
+.panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.panel {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.panel.open {
+  border-color: var(--primary);
+}
+.panel-header-row {
+  display: flex;
+  align-items: stretch;
+}
+/* 좌측 드래그 손잡이(⠿) — 잡고 위/아래로 끌어 순서 이동 */
+.drag-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px 0 12px;
+  font-size: 18px;
+  color: var(--ink-mute);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.drag-grip:hover {
+  color: var(--primary);
+}
+.drag-grip:active {
+  cursor: grabbing;
+}
+.panel-header {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--ink);
+  transition: background 0.12s;
+}
+.panel-header:hover {
+  background: var(--canvas-lavender);
+}
+/* 드래그 중/드롭 대상 표시 */
+.panel.dragging {
+  opacity: 0.5;
+}
+.panel.drag-over {
+  border-color: var(--primary);
+  box-shadow: 0 -3px 0 0 var(--primary) inset;
+}
+.chevron {
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.chevron.down {
+  transform: rotate(90deg);
+  color: var(--primary);
+}
+.panel-title {
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 22px; /* heading-md */
+  font-weight: 700;
+  letter-spacing: -0.096px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  border-radius: var(--pill);
+  padding: 3px 12px;
+}
+.panel-body {
+  padding: 4px 24px 24px;
+  border-top: 1px solid var(--hairline);
+}
+.panel-body .card-grid {
+  padding-top: 16px;
+}
+.section-empty {
+  padding: 20px 0;
+  text-align: left;
+}
+.filter-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--canvas-lavender);
+  border: 1px solid var(--primary);
+  border-radius: var(--pill);
+  padding: 2px 10px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* ---------- 뉴스 카드(블럭) ---------- */
+.news-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: 12px; /* rounded.lg — mid card */
+  box-shadow: var(--shadow);
+  padding: 20px;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.news-card:hover {
+  transform: translateY(-2px);
+  box-shadow: rgba(74, 21, 75, 0.16) 0 8px 24px 0;
+  border-color: var(--primary);
+}
+.news-card .title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: 0.16px;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+.news-card .desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.news-card .meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: auto;
+}
+.news-card .meta .rel {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* ---------- 상태 표시 ---------- */
+.empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 12px;
+}
+.banner {
+  background: var(--canvas-cream);
+  border: 1px solid #e7bfae;
+  color: var(--danger);
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.55;
+}
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary); /* aubergine footer band feel */
+  color: var(--on-primary);
+  padding: 12px 28px;
+  border-radius: var(--pill);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0 1px 10px 0;
+  z-index: 100;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 반응형: display 계단식 축소 ---------- */
+@media (max-width: 768px) {
+  .topbar h1 {
+    font-size: 28px;
+  }
+  .subtitle {
+    font-size: 12px;
+    white-space: normal; /* 좁은 화면에선 줄바꿈 허용(잘림 방지) */
+    overflow: visible;
+  }
+  .panel-title {
+    font-size: 20px;
+  }
+}
