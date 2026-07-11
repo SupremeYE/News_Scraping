@@ -141,3 +141,18 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python (backend)
+__pycache__/
+*.pyc
+.venv/
+venv/
+backend/.env
+backend/news.db
+
+# 참고용으로 클론해 둔 외부 저장소(별도 .git) — 이 프로젝트에 포함하지 않음
+awesome-design-md/
+
+# OS
+.DS_Store
+Thumbs.db
