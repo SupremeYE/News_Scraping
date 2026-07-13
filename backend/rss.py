@@ -5,11 +5,16 @@
 dc:date/pubDate 를 알아서 처리한다.
 """
 import time
+import urllib.request
 from urllib.parse import urlparse
 
 import feedparser
 
 from naver import _clean  # HTML 태그/엔티티 제거 로직 재사용
+
+# 일부 언론사(예: 한국경제)는 feedparser 기본 User-Agent 나 긴 Chrome UA 를 403 으로
+# 막는다. 짧은 'Mozilla/5.0' 은 통과하므로, 바이트를 직접 받아 feedparser 에 넘긴다.
+_RSS_UA = "Mozilla/5.0"
 
 
 class RssError(RuntimeError):
@@ -50,7 +55,16 @@ def fetch_rss(feed_url: str) -> list:
     각 기사: { title, link, description, pub_date, source }
     """
     try:
-        parsed = feedparser.parse(feed_url)
+        req = urllib.request.Request(
+            feed_url, headers={"User-Agent": _RSS_UA, "Accept": "*/*"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read()
+    except Exception as e:
+        raise RssError(f"RSS 피드를 가져오지 못했습니다: {feed_url} ({e})") from e
+
+    try:
+        # 바이트를 넘기면 feedparser 가 인코딩(EUC-KR 등)을 자동 감지한다.
+        parsed = feedparser.parse(raw)
     except Exception as e:  # feedparser 는 대개 예외를 안 내지만 방어
         raise RssError(f"RSS 파싱 실패: {e}") from e
 

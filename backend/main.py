@@ -31,12 +31,38 @@ from rss import RssError, fetch_rss
 
 scheduler = BackgroundScheduler()
 
-# 큐레이션된 RSS 프리셋(한 번 클릭으로 추가). 정보보안/AI 뉴스용.
+# 큐레이션된 RSS 프리셋(한 번 클릭으로 추가). 정보보안 + 경제.
+# name 이 곧 출처 표시명(source_label)이 된다. feed_url 은 실제 응답 확인된 것만 등록.
 RSS_PRESETS = [
     {
         "name": "보안뉴스",
         "feed_url": "https://www.boannews.com/media/news_rss.xml",
         "description": "정보보안·AI 보안 전문 매체(전체기사)",
+    },
+    {
+        "name": "연합뉴스 경제",
+        "feed_url": "https://www.yna.co.kr/rss/economy.xml",
+        "description": "연합뉴스 경제면(속보 다수, 커버리지 넓음)",
+    },
+    {
+        "name": "한국경제",
+        "feed_url": "https://www.hankyung.com/feed/economy",
+        "description": "한국경제 경제면",
+    },
+    {
+        "name": "한국경제 금융",
+        "feed_url": "https://www.hankyung.com/feed/finance",
+        "description": "한국경제 금융·증시면",
+    },
+    {
+        "name": "동아일보 경제",
+        "feed_url": "https://rss.donga.com/economy.xml",
+        "description": "동아일보 경제면",
+    },
+    {
+        "name": "한겨레 경제",
+        "feed_url": "https://www.hani.co.kr/rss/economy/",
+        "description": "한겨레 경제면",
     },
 ]
 
