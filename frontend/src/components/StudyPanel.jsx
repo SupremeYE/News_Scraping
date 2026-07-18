@@ -48,6 +48,7 @@ export default function StudyPanel({
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
+  const [askedQ, setAskedQ] = useState(""); // 답변에 대응하는 실제 질문(저장용)
   const [asking, setAsking] = useState(false);
 
   const articleId = article.id;
@@ -151,19 +152,28 @@ export default function StudyPanel({
     [articleId, onToast]
   );
 
-  // 섹션 해설을 노트에 이어 붙여 저장.
-  const appendToNote = useCallback(
-    (section) => {
-      const content = study[section];
+  // 제목(heading) + 내용을 노트에 이어 붙여 저장(섹션/Q&A 공용).
+  const appendBlock = useCallback(
+    (heading, content) => {
       if (!content) return;
-      const heading = `## ${labels[section] || section}`;
-      const next = note
-        ? `${note.trimEnd()}\n\n${heading}\n${content}`
-        : `${heading}\n${content}`;
+      const block = `${heading}\n${content}`;
+      const next = note ? `${note.trimEnd()}\n\n${block}` : block;
       setNote(next);
       saveNote(next);
     },
-    [study, note, labels, saveNote]
+    [note, saveNote]
+  );
+
+  // 섹션 해설을 노트에 이어 붙여 저장.
+  const appendToNote = useCallback(
+    (section) => appendBlock(`## ${labels[section] || section}`, study[section]),
+    [appendBlock, labels, study]
+  );
+
+  // Q&A 답변을 '질문 + 답변' 형태로 노트에 저장.
+  const saveQaToNote = useCallback(
+    () => appendBlock(`## 질문: ${askedQ}`, answer),
+    [appendBlock, askedQ, answer]
   );
 
   const saveTerm = useCallback(
@@ -196,7 +206,10 @@ export default function StudyPanel({
         setWarning(res.warning);
         if (res.prompt) setPromptText(res.prompt);
       }
-      if (res.answer) setAnswer(res.answer);
+      if (res.answer) {
+        setAnswer(res.answer);
+        setAskedQ(q);
+      }
     } catch (e) {
       setWarning(e.message);
     } finally {
@@ -340,7 +353,18 @@ export default function StudyPanel({
                 </button>
               </div>
               {answer && (
-                <div className="study-content study-answer">{answer}</div>
+                <>
+                  <div className="study-content study-answer">{answer}</div>
+                  <div className="study-note-actions">
+                    <button
+                      className="btn btn-sm"
+                      onClick={saveQaToNote}
+                      disabled={noteSaving}
+                    >
+                      노트에 저장
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )}
