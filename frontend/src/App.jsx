@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Dashboard from "./components/Dashboard.jsx";
 import KeywordManager from "./components/KeywordManager.jsx";
+import StudyPanel from "./components/StudyPanel.jsx";
+import LibraryView from "./components/LibraryView.jsx";
 import * as api from "./api.js";
 
 export default function App() {
@@ -15,6 +17,11 @@ export default function App() {
   const [banner, setBanner] = useState(null);
   // 키워드 클릭 시 해당 패널로 스크롤/펼침 요청. n 을 증가시켜 같은 채널 반복 클릭도 반영.
   const [focus, setFocus] = useState({ id: null, n: 0 });
+  // AI 스터디: 'dashboard' | 'library'(학습 노트) 뷰, 열린 기사, 섹션 메타, 저장소 새로고침 키
+  const [view, setView] = useState("dashboard");
+  const [studyArticle, setStudyArticle] = useState(null);
+  const [sectionsMeta, setSectionsMeta] = useState(null);
+  const [libRefresh, setLibRefresh] = useState(0);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -40,7 +47,13 @@ export default function App() {
   useEffect(() => {
     refreshAll("recent").catch((e) => setBanner(e.message));
     api.getPresets().then(setPresets).catch(() => {});
+    api.getStudySections().then(setSectionsMeta).catch(() => {});
   }, [refreshAll]);
+
+  // 뉴스 카드 클릭 → 스터디 패널 열기
+  const onOpenArticle = (article) => setStudyArticle(article);
+  // 용어/노트가 저장되면 학습 노트 뷰 새로고침
+  const bumpLibrary = () => setLibRefresh((n) => n + 1);
 
   const onSelectDate = async (e) => {
     const date = e.target.value;
@@ -131,28 +144,50 @@ export default function App() {
           뉴스 대시보드
         </h1>
         <div className="topbar-actions">
-          <select className="select" value={selectedDate} onChange={onSelectDate}>
-            <option value="recent">최근</option>
-            {dates.map((d) => (
-              <option key={d} value={d}>
-                {d === todayIso ? `오늘 (${d})` : d}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn btn-primary"
-            onClick={onUpdate}
-            disabled={updating}
-          >
-            {updating ? (
-              <>
-                <span className="spinner" />
-                동기화 중…
-              </>
-            ) : (
-              "↻ 업데이트"
-            )}
-          </button>
+          <div className="view-switch">
+            <button
+              className={`view-btn ${view === "dashboard" ? "active" : ""}`}
+              onClick={() => setView("dashboard")}
+            >
+              대시보드
+            </button>
+            <button
+              className={`view-btn ${view === "library" ? "active" : ""}`}
+              onClick={() => setView("library")}
+            >
+              학습 노트
+            </button>
+          </div>
+          {view === "dashboard" && (
+            <>
+              <select
+                className="select"
+                value={selectedDate}
+                onChange={onSelectDate}
+              >
+                <option value="recent">최근</option>
+                {dates.map((d) => (
+                  <option key={d} value={d}>
+                    {d === todayIso ? `오늘 (${d})` : d}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn btn-primary"
+                onClick={onUpdate}
+                disabled={updating}
+              >
+                {updating ? (
+                  <>
+                    <span className="spinner" />
+                    동기화 중…
+                  </>
+                ) : (
+                  "↻ 업데이트"
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
       <p className="subtitle">
@@ -162,22 +197,43 @@ export default function App() {
 
       {banner && <div className="banner">{banner}</div>}
 
-      <KeywordManager
-        keywords={keywords}
-        presets={presets}
-        onAddChannel={onAddChannel}
-        onDelete={onDeleteKeyword}
-        onFocusChannel={onFocusChannel}
-        busy={busy}
-      />
+      {view === "dashboard" ? (
+        <>
+          <KeywordManager
+            keywords={keywords}
+            presets={presets}
+            onAddChannel={onAddChannel}
+            onDelete={onDeleteKeyword}
+            onFocusChannel={onFocusChannel}
+            busy={busy}
+          />
 
-      <Dashboard
-        groups={groups}
-        isRecent={selectedDate === "recent"}
-        onReorder={onReorderChannels}
-        focus={focus}
-        busy={busy}
-      />
+          <Dashboard
+            groups={groups}
+            isRecent={selectedDate === "recent"}
+            onReorder={onReorderChannels}
+            onOpenArticle={onOpenArticle}
+            focus={focus}
+            busy={busy}
+          />
+        </>
+      ) : (
+        <LibraryView
+          refreshKey={libRefresh}
+          onOpenArticle={onOpenArticle}
+          onToast={showToast}
+        />
+      )}
+
+      {studyArticle && (
+        <StudyPanel
+          article={studyArticle}
+          sectionsMeta={sectionsMeta}
+          onClose={() => setStudyArticle(null)}
+          onToast={showToast}
+          onGlossaryChange={bumpLibrary}
+        />
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

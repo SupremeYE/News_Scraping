@@ -1,4 +1,5 @@
-// 개별 뉴스 기사 카드. 클릭 시 원문을 새 탭으로 연다.
+// 개별 뉴스 카드. 클릭하면 AI 스터디 패널을 연다(onOpen).
+// 원문은 카드 하단의 "원문 ↗" 링크로 새 탭에서 열 수 있다(기존 동작 유지).
 
 // 절대 시각: "MM/DD HH:MM"
 function formatDate(pubDate) {
@@ -29,15 +30,22 @@ function relativeTime(pubDate) {
   return `${day}일 전`;
 }
 
-export default function NewsCard({ article }) {
+export default function NewsCard({ article, onOpen }) {
   const rel = relativeTime(article.pub_date);
   const abs = formatDate(article.pub_date);
+
   return (
-    <a
+    <div
       className="news-card"
-      href={article.link}
-      target="_blank"
-      rel="noopener noreferrer"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen && onOpen(article)}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && onOpen) {
+          e.preventDefault();
+          onOpen(article);
+        }
+      }}
     >
       <div className="title">{article.title}</div>
       {article.description && <div className="desc">{article.description}</div>}
@@ -48,7 +56,18 @@ export default function NewsCard({ article }) {
           </span>
         )}
         {article.source && <span>{article.source}</span>}
+        <a
+          className="card-orig"
+          href={article.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="원문 새 탭으로 열기"
+        >
+          원문 ↗
+        </a>
       </div>
-    </a>
+      <div className="card-study-hint">클릭 → AI 스터디</div>
+    </div>
   );
 }

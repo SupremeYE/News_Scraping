@@ -5,3 +5,4 @@ feedparser
 apscheduler
 python-dotenv
 pydantic
+trafilatura

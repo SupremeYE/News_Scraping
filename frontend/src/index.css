@@ -567,6 +567,425 @@ button {
   }
 }
 
+/* ---------- 뷰 전환(대시보드 / 학습 노트) ---------- */
+.view-switch {
+  display: inline-flex;
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  border-radius: var(--pill);
+  padding: 3px;
+}
+.view-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink-mute);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 7px 16px;
+  border-radius: var(--pill);
+}
+.view-btn.active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* 뉴스 카드 — 클릭 진입 힌트 + 원문 링크 */
+.news-card {
+  cursor: pointer;
+  position: relative;
+}
+.card-orig {
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.card-study-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.news-card:hover .card-study-hint {
+  opacity: 1;
+}
+
+/* 작은 버튼 변형(패널/모달용) */
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* ---------- AI 스터디 모달 ---------- */
+.study-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 29, 29, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  z-index: 200;
+  overflow-y: auto;
+}
+.study-modal {
+  background: var(--canvas);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 820px;
+  box-shadow: rgba(0, 0, 0, 0.25) 0 12px 48px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.study-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.study-head-main {
+  flex: 1;
+  min-width: 0;
+}
+.study-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.study-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.study-orig {
+  font-weight: 700;
+}
+.study-close {
+  border: none;
+  background: var(--canvas-cream);
+  color: var(--ink-mute);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 15px;
+  flex: 0 0 auto;
+}
+.study-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.study-actions-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  background: var(--canvas-lavender);
+}
+.study-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.study-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 12px 24px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.study-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.study-tab:hover {
+  color: var(--primary);
+}
+.study-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.study-tab .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  display: inline-block;
+}
+.study-warning {
+  margin: 14px 24px 0;
+  background: var(--canvas-cream);
+  border: 1px solid #e7bfae;
+  color: var(--danger);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.study-prompt-box {
+  margin: 14px 24px 0;
+}
+.study-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.study-prompt-box textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.study-body {
+  padding: 18px 24px 26px;
+}
+
+/* 섹션 뷰 */
+.study-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.study-loading,
+.study-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 16px 0;
+  line-height: 1.5;
+}
+.study-content {
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+.study-answer {
+  margin-top: 14px;
+  background: var(--canvas-lavender);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* 용어 카드 목록 */
+.term-list,
+.term-grid {
+  display: grid;
+  gap: 12px;
+}
+.term-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.term-card {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--canvas);
+}
+.term-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.term-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.btn-save-term {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+.term-del {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.term-del:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.term-exp {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.term-ex {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Q&A / 노트 */
+.study-qa-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.study-qa-row {
+  display: flex;
+  gap: 8px;
+}
+.study-qa-row .input {
+  flex: 1;
+}
+.study-note-area,
+.study-note textarea {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.study-note-actions {
+  margin-top: 10px;
+}
+
+/* ---------- 학습 노트 뷰(라이브러리) ---------- */
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.lib-block {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.lib-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.lib-head h2 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+.lib-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  border-radius: var(--pill);
+  padding: 3px 12px;
+}
+.lib-search {
+  margin-left: auto;
+  max-width: 240px;
+}
+/* 용어 직접 추가 폼(복사 경로로 받은 용어를 손으로 담기) */
+.term-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.term-add-form .input {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+.term-add-term {
+  flex: 0 0 160px;
+}
+.term-add-exp {
+  flex: 2 1 220px;
+}
+.term-add-ex {
+  flex: 1 1 160px;
+}
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.note-item {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.note-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.note-item-title {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  padding: 0;
+  line-height: 1.4;
+}
+.note-item-title:hover {
+  color: var(--primary);
+}
+.note-item-orig {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.note-item-src {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.note-item-body {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
 /* ---------- 반응형: display 계단식 축소 ---------- */
 @media (max-width: 768px) {
   .topbar h1 {
@@ -579,5 +998,13 @@ button {
   }
   .panel-title {
     font-size: 20px;
+  }
+  .study-overlay {
+    padding: 0;
+  }
+  .study-modal {
+    max-width: 100%;
+    min-height: 100%;
+    border-radius: 0;
   }
 }

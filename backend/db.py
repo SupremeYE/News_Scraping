@@ -109,6 +109,52 @@ def init_db():
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_articles_date ON articles(article_date)"
         )
+        # articles 마이그레이션: 원문 본문 캐시 컬럼(body) 추가(없을 때만).
+        art_cols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
+        if "body" not in art_cols:
+            conn.execute("ALTER TABLE articles ADD COLUMN body TEXT")
+
+        # ---------- 학습(스터디) 레이어 ----------
+        # article_study: 기사별 AI 해설 캐시. section ∈ summary|terms|context|meaning.
+        #   재열람 시 즉시 반환(비용 절약), force 로 재생성. 기사 삭제 시 함께 삭제.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS article_study (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                article_id  INTEGER NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+                section     TEXT NOT NULL,
+                content     TEXT NOT NULL,
+                model       TEXT,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                UNIQUE(article_id, section)
+            )
+            """
+        )
+        # glossary: 축적되는 개인 용어장(경제 문맹 탈출용). term 기준 upsert.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS glossary (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                term        TEXT NOT NULL UNIQUE,
+                explanation TEXT,
+                example     TEXT,
+                article_id  INTEGER REFERENCES articles(id) ON DELETE SET NULL,
+                created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            )
+            """
+        )
+        # notes: 기사별 스터디 노트(내 정리 + 저장한 AI 해설). 기사당 1개(upsert).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notes (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                article_id  INTEGER NOT NULL UNIQUE REFERENCES articles(id) ON DELETE CASCADE,
+                body        TEXT NOT NULL DEFAULT '',
+                created_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            )
+            """
+        )
 
 
 # ---------- 키워드 ----------
@@ -253,13 +299,13 @@ def dashboard(target_date: str = None, recent_days: int = None):
         for kw in keywords:
             if recent_mode:
                 sql = (
-                    "SELECT title, link, description, pub_date, source "
+                    "SELECT id, title, link, description, pub_date, source "
                     "FROM articles WHERE keyword_id = ? AND article_date >= ?"
                 )
                 params = [kw["id"], cutoff]
             else:
                 sql = (
-                    "SELECT title, link, description, pub_date, source "
+                    "SELECT id, title, link, description, pub_date, source "
                     "FROM articles WHERE keyword_id = ? AND article_date = ?"
                 )
                 params = [kw["id"], target_date]
@@ -302,3 +348,158 @@ def list_dates():
             "SELECT DISTINCT article_date FROM articles ORDER BY article_date DESC"
         ).fetchall()
         return [r["article_date"] for r in rows]
+
+
+def get_article(article_id: int):
+    """단일 기사 행을 dict 로 반환(없으면 None). 프롬프트/LLM 입력 구성에 사용.
+
+    기사가 속한 채널 정보(channel_name/channel_kind/source_label/filter_kw)를 조인해
+    함께 준다 → LLM 프롬프트가 뉴스 분야(경제/AI/보안 등)를 파악하는 힌트로 쓴다.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT a.id, a.keyword_id, a.title, a.link, a.description,
+                   a.pub_date, a.source, a.article_date, a.body,
+                   k.keyword AS channel_name, k.kind AS channel_kind,
+                   k.source_label, k.filter_kw
+            FROM articles a JOIN keywords k ON k.id = a.keyword_id
+            WHERE a.id = ?
+            """,
+            (article_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def save_article_body(article_id: int, body: str) -> None:
+    """원문 본문을 기사에 캐시(1회 수집 후 재사용)."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE articles SET body = ? WHERE id = ?", (body, article_id)
+        )
+
+
+# ---------- 학습(스터디) 레이어 ----------
+
+def get_study(article_id: int) -> dict:
+    """기사의 캐시된 AI 해설을 { section: content } 형태로 반환(없으면 빈 dict)."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT section, content FROM article_study WHERE article_id = ?",
+            (article_id,),
+        ).fetchall()
+        return {r["section"]: r["content"] for r in rows}
+
+
+def save_study(article_id: int, section: str, content: str, model: str = None) -> None:
+    """섹션별 AI 해설을 저장/갱신(upsert). 같은 (article_id, section)이면 덮어쓴다."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO article_study (article_id, section, content, model)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(article_id, section)
+            DO UPDATE SET content = excluded.content,
+                          model = excluded.model,
+                          created_at = datetime('now', 'localtime')
+            """,
+            (article_id, section, content, model),
+        )
+
+
+# ---------- 용어장 ----------
+
+def list_glossary(query: str = None) -> list:
+    """축적된 용어 목록(최신순). query 가 있으면 용어/설명에서 부분검색."""
+    with get_conn() as conn:
+        if query:
+            like = f"%{query.strip()}%"
+            rows = conn.execute(
+                "SELECT id, term, explanation, example, article_id, created_at "
+                "FROM glossary WHERE term LIKE ? OR explanation LIKE ? "
+                "ORDER BY created_at DESC, id DESC",
+                (like, like),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, term, explanation, example, article_id, created_at "
+                "FROM glossary ORDER BY created_at DESC, id DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def upsert_term(term: str, explanation: str = None, example: str = None,
+                article_id: int = None) -> dict:
+    """용어를 용어장에 추가/갱신(term 기준). 저장된 행을 반환."""
+    term = (term or "").strip()
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO glossary (term, explanation, example, article_id)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(term)
+            DO UPDATE SET explanation = excluded.explanation,
+                          example = excluded.example,
+                          article_id = COALESCE(excluded.article_id, glossary.article_id)
+            """,
+            (term, explanation, example, article_id),
+        )
+        row = conn.execute(
+            "SELECT id, term, explanation, example, article_id, created_at "
+            "FROM glossary WHERE term = ?",
+            (term,),
+        ).fetchone()
+        return dict(row)
+
+
+def delete_term(term_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute("DELETE FROM glossary WHERE id = ?", (term_id,))
+        return cur.rowcount > 0
+
+
+# ---------- 스터디 노트 ----------
+
+def get_note(article_id: int) -> dict:
+    """기사의 노트를 반환(없으면 None). 기사 메타(title/link/source)를 함께 조인."""
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT n.id, n.article_id, n.body, n.created_at, n.updated_at,
+                   a.title, a.link, a.source, a.pub_date
+            FROM notes n JOIN articles a ON a.id = n.article_id
+            WHERE n.article_id = ?
+            """,
+            (article_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def upsert_note(article_id: int, body: str) -> dict:
+    """기사별 노트를 저장/갱신(upsert). 기사당 1개."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO notes (article_id, body)
+            VALUES (?, ?)
+            ON CONFLICT(article_id)
+            DO UPDATE SET body = excluded.body,
+                          updated_at = datetime('now', 'localtime')
+            """,
+            (article_id, body or ""),
+        )
+    return get_note(article_id)
+
+
+def list_notes() -> list:
+    """저장된 노트 목록(최근 수정순), 기사 메타 포함. = 학습 노트 뷰."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT n.id, n.article_id, n.body, n.created_at, n.updated_at,
+                   a.title, a.link, a.source, a.pub_date
+            FROM notes n JOIN articles a ON a.id = n.article_id
+            ORDER BY n.updated_at DESC, n.id DESC
+            """
+        ).fetchall()
+        return [dict(r) for r in rows]

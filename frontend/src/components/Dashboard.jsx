@@ -8,6 +8,7 @@ export default function Dashboard({
   groups,
   isRecent = false,
   onReorder,
+  onOpenArticle,
   focus = { id: null, n: 0 },
   busy = false,
 }) {
@@ -150,7 +151,11 @@ export default function Dashboard({
                 ) : (
                   <div className="card-grid">
                     {g.articles.map((a, idx) => (
-                      <NewsCard key={idx} article={a} />
+                      <NewsCard
+                        key={a.id ?? idx}
+                        article={a}
+                        onOpen={onOpenArticle}
+                      />
                     ))}
                   </div>
                 )}

@@ -25,6 +25,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import db
+import extract
+import llm
 from boannews import BoannewsError, search_boannews
 from naver import NaverApiError, NaverCredentialsError, fetch_news
 from rss import RssError, fetch_rss
@@ -275,6 +277,193 @@ def run_update():
 
 def _today() -> str:
     return date.today().isoformat()
+
+
+# ---------- 학습(스터디) 레이어 ----------
+
+class StudyIn(BaseModel):
+    sections: list[str] | None = None  # 없으면 4개 전부
+    force: bool = False                # True 면 캐시 무시하고 재생성
+
+
+class AskIn(BaseModel):
+    question: str = ""
+
+
+class TermIn(BaseModel):
+    term: str = ""
+    explanation: str | None = None
+    example: str | None = None
+    article_id: int | None = None
+
+
+class NoteIn(BaseModel):
+    body: str = ""
+
+
+def _load_article(article_id: int):
+    """기사 조회 + 원문 본문 지연수집(최초 1회). 없으면 None.
+
+    본문이 비어 있으면 링크에서 긁어와 캐시하고, 실패하면 요약 스니펫으로 폴백(그대로).
+    """
+    art = db.get_article(article_id)
+    if art is None:
+        return None
+    if not (art.get("body") or "").strip():
+        try:
+            text = extract.fetch_article_text(art["link"])
+        except Exception:
+            text = ""
+        if text:
+            db.save_article_body(article_id, text)
+            art["body"] = text
+    return art
+
+
+@app.get("/api/study/sections")
+def get_study_sections():
+    """섹션 순서와 표시 이름(프론트 탭 라벨을 서버와 일치시킴)."""
+    return {
+        "order": llm.SECTION_ORDER,
+        "labels": {k: v["label"] for k, v in llm.SECTIONS.items()},
+    }
+
+
+@app.get("/api/articles/{article_id}/study")
+def get_article_study(article_id: int):
+    """기사의 캐시된 AI 해설만 반환(LLM 미호출). 패널 열 때 사용."""
+    if db.get_article(article_id) is None:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
+    return {"study": db.get_study(article_id)}
+
+
+@app.post("/api/articles/{article_id}/study")
+def run_article_study(article_id: int, payload: StudyIn):
+    """요청 섹션 중 없는(또는 force) 것만 LLM 호출→캐시 저장 후 전체를 반환.
+
+    키가 없으면 warning 을 담아 반환(프론트는 '프롬프트 복사'로 유도).
+    """
+    article = _load_article(article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
+
+    requested = payload.sections or llm.SECTION_ORDER
+    sections = [s for s in requested if s in llm.SECTIONS]
+
+    cached = db.get_study(article_id)
+    result = dict(cached)
+    warning = None
+    model = llm.get_model()
+
+    def _save(section, content):
+        db.save_study(article_id, section, content, model)
+        result[section] = content
+
+    # 생성이 필요한 섹션(캐시에 없거나 force).
+    remaining = [s for s in sections if payload.force or s not in cached]
+
+    # 2개 이상이면 통합 1회 호출로 본문 반복입력을 피한다(토큰 절약).
+    if len(remaining) >= 2:
+        try:
+            combined = llm.run_all_sections(article)
+            for s in list(remaining):
+                if s in combined:
+                    _save(s, combined[s])
+                    remaining.remove(s)
+        except llm.LlmCredentialsError as e:
+            warning = str(e)
+            remaining = []  # 키 문제면 개별 시도도 무의미
+        except llm.LlmError:
+            pass  # 통합 실패(파싱 등) → 아래 섹션별 폴백
+
+    # 남은 섹션은 개별 호출(통합 실패분 또는 단일 요청).
+    for s in remaining:
+        try:
+            content = llm.run_section(article, s)
+        except llm.LlmCredentialsError as e:
+            warning = str(e)
+            break
+        except llm.LlmError as e:
+            warning = str(e)
+            continue
+        _save(s, content)
+
+    return {"study": result, "warning": warning}
+
+
+@app.get("/api/articles/{article_id}/prompt")
+def get_article_prompt(article_id: int, section: str = "all"):
+    """무료 경로용 복사 프롬프트(구독 챗에 붙여넣기). section='all'|각 섹션명.
+
+    복사본에도 원문 본문이 담기도록 지연수집한다(붙여넣기만으로 챗이 내용을 알게).
+    """
+    article = _load_article(article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
+    if section != "all" and section not in llm.SECTIONS:
+        raise HTTPException(status_code=400, detail="알 수 없는 섹션입니다.")
+    return {"prompt": llm.build_copy_prompt(article, section)}
+
+
+@app.post("/api/articles/{article_id}/ask")
+def ask_article(article_id: int, payload: AskIn):
+    """기사에 대한 자유 질문 Q&A. 키 없으면 복사 프롬프트를 warning 과 함께 반환."""
+    article = _load_article(article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="질문을 입력하세요.")
+    system, user = llm.build_question_messages(article, question)
+    try:
+        answer = llm.generate(system, user)
+    except llm.LlmCredentialsError as e:
+        return {"answer": None, "warning": str(e), "prompt": f"{system}\n\n{user}"}
+    except llm.LlmError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"answer": answer, "warning": None}
+
+
+# ---------- 용어장 ----------
+
+@app.get("/api/glossary")
+def get_glossary(q: str | None = None):
+    return db.list_glossary(q)
+
+
+@app.post("/api/glossary")
+def add_term(payload: TermIn):
+    term = (payload.term or "").strip()
+    if not term:
+        raise HTTPException(status_code=400, detail="용어를 입력하세요.")
+    return db.upsert_term(term, payload.explanation, payload.example, payload.article_id)
+
+
+@app.delete("/api/glossary/{term_id}")
+def remove_term(term_id: int):
+    if not db.delete_term(term_id):
+        raise HTTPException(status_code=404, detail="해당 용어를 찾을 수 없습니다.")
+    return {"deleted": term_id}
+
+
+# ---------- 스터디 노트 ----------
+
+@app.get("/api/notes")
+def get_notes():
+    return db.list_notes()
+
+
+@app.get("/api/notes/{article_id}")
+def get_one_note(article_id: int):
+    """기사의 노트(없으면 빈 객체)."""
+    return db.get_note(article_id) or {}
+
+
+@app.put("/api/notes/{article_id}")
+def put_note(article_id: int, payload: NoteIn):
+    if db.get_article(article_id) is None:
+        raise HTTPException(status_code=404, detail="기사를 찾을 수 없습니다.")
+    return db.upsert_note(article_id, payload.body)
 
 
 # ---------- 정적 프론트 서빙(단일 서버 배포) ----------
