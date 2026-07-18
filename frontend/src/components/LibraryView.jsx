@@ -1,50 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import * as api from "../api.js";
+import { renderNoteBody, notePreview } from "../note.jsx";
 
 // "학습 노트" 뷰 — 축적된 용어장 + 스터디 노트를 모아본다(input 저장소).
 // 서브 탭(용어장 | 스터디 노트)으로 한 번에 하나만 보여 스크롤을 줄이고,
 // 노트는 아코디언(기본 접힘)으로 접어 둔다. refreshKey 가 바뀌면 다시 로드.
-
-// ── 마크다운-라이트: 노트 본문의 '## 소제목' / '- 목록' 을 렌더(라이브러리 없이) ──
-function renderNoteBody(body) {
-  const lines = (body || "").split("\n");
-  const out = [];
-  lines.forEach((line, i) => {
-    const t = line.trim();
-    if (/^#{2,3}\s+/.test(t)) {
-      out.push(
-        <div className="note-h" key={i}>
-          {t.replace(/^#{2,3}\s+/, "")}
-        </div>
-      );
-    } else if (/^[-*]\s+/.test(t)) {
-      out.push(
-        <div className="note-li" key={i}>
-          {t.replace(/^[-*]\s+/, "")}
-        </div>
-      );
-    } else if (t === "") {
-      out.push(<div className="note-gap" key={i} />);
-    } else {
-      out.push(
-        <div className="note-p" key={i}>
-          {line}
-        </div>
-      );
-    }
-  });
-  return out;
-}
-
-// 접힘 상태 미리보기: 마크다운 기호 제거 후 앞부분만.
-function notePreview(body, max = 120) {
-  const clean = (body || "")
-    .replace(/^#{2,3}\s+/gm, "")
-    .replace(/^[-*]\s+/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return clean.length > max ? `${clean.slice(0, max)}…` : clean;
-}
+// 노트 본문 렌더/미리보기는 공유 모듈(note.jsx) 사용.
 
 export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
   const [tab, setTab] = useState("glossary"); // 'glossary' | 'notes'

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as api from "../api.js";
+import { renderNoteBody } from "../note.jsx";
 
 // 뉴스 카드 클릭 시 열리는 AI 스터디 모달.
 // - 4개 섹션(핵심요약/용어풀이/맥락·연결/나에게의 의미) 해설을 생성/열람(캐시)
@@ -45,6 +46,8 @@ export default function StudyPanel({
 
   const [note, setNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [notePreviewOn, setNotePreviewOn] = useState(false);
+  const noteDirty = useRef(false); // 사용자가 노트를 편집했는지(비동기 로드 덮어쓰기 방지)
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
@@ -62,13 +65,15 @@ export default function StudyPanel({
     setAnswer(null);
     setQuestion("");
     setTab(order[0]);
+    noteDirty.current = false; // 새 기사: 편집 플래그 리셋
     api
       .getStudy(articleId)
       .then((r) => alive && setStudy(r.study || {}))
       .catch(() => {});
     api
       .getNote(articleId)
-      .then((r) => alive && setNote(r?.body || ""))
+      // 사용자가 이미 타이핑했으면(레이스) 로드로 덮어쓰지 않는다.
+      .then((r) => alive && !noteDirty.current && setNote(r?.body || ""))
       .catch(() => {});
     return () => {
       alive = false;
@@ -156,6 +161,7 @@ export default function StudyPanel({
   const appendBlock = useCallback(
     (heading, content) => {
       if (!content) return;
+      noteDirty.current = true;
       const block = `${heading}\n${content}`;
       const next = note ? `${note.trimEnd()}\n\n${block}` : block;
       setNote(next);
@@ -373,13 +379,22 @@ export default function StudyPanel({
           {tab === "note" && (
             <div className="study-note">
               <p className="study-qa-hint">
-                내 정리, 또는 구독 챗에서 받은 답변을 붙여넣어 저장하세요. 저장한
-                노트는 "학습 노트"에서 모아볼 수 있습니다.
+                이 칸 <b>전체가 저장</b>됩니다. 기존 내용을 지우지 말고 이어서 쓰세요.
+                (열 때 저장해둔 내용이 자동으로 채워집니다.)
+                <br />
+                <span className="note-syntax">
+                  지원: <code>## 제목</code> · <code>- 목록</code> ·{" "}
+                  <code>1. 번호</code> · <code>**굵게**</code> ·{" "}
+                  <code>[링크](url)</code> · <code>![](이미지url)</code>
+                </span>
               </p>
               <textarea
                 className="study-note-area"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  noteDirty.current = true;
+                  setNote(e.target.value);
+                }}
                 placeholder="여기에 메모하거나 답변을 붙여넣으세요…"
                 rows={12}
               />
@@ -391,7 +406,22 @@ export default function StudyPanel({
                 >
                   {noteSaving ? "저장 중…" : "노트 저장"}
                 </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setNotePreviewOn((v) => !v)}
+                >
+                  {notePreviewOn ? "미리보기 닫기" : "미리보기"}
+                </button>
               </div>
+              {notePreviewOn && (
+                <div className="note-preview-box">
+                  {note.trim() ? (
+                    renderNoteBody(note)
+                  ) : (
+                    <div className="study-empty">아직 내용이 없습니다.</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

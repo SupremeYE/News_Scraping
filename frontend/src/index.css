@@ -1053,11 +1053,21 @@ button {
   margin: 12px 0 4px;
   font-size: 14px;
 }
-.note-item-body > .note-h:first-child {
+.note-h1 {
+  font-size: 17px;
+}
+.note-h2 {
+  font-size: 15px;
+}
+.note-h3 {
+  font-size: 14px;
+}
+.note-item-body > .note-h:first-child,
+.note-preview-box > .note-h:first-child {
   margin-top: 0;
 }
 .note-li {
-  padding-left: 14px;
+  padding-left: 16px;
   position: relative;
 }
 .note-li::before {
@@ -1066,14 +1076,58 @@ button {
   left: 2px;
   color: var(--text-muted);
 }
+.note-li-num::before {
+  content: attr(data-n);
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .note-p {
   white-space: pre-wrap;
+}
+.note-p a,
+.note-li a,
+.note-h a {
+  color: var(--link-blue);
+  font-weight: 600;
+}
+.note-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  margin: 10px 0;
 }
 .note-gap {
   height: 8px;
 }
 .note-item-actions {
   margin-top: 12px;
+}
+
+/* 내 노트 편집 — 지원 문법 안내 + 미리보기 */
+.note-syntax {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.note-syntax code {
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+.note-preview-box {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  background: var(--canvas-lavender);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink);
 }
 
 /* ---------- 반응형: display 계단식 축소 ---------- */
