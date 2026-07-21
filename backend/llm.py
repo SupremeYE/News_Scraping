@@ -13,8 +13,10 @@
 LlmCredentialsError 를 던진다. 이 경우 엔드포인트는 '프롬프트 복사'(무료 경로)만
 안내하고 warning 을 반환한다.
 """
+
 import json
 import os
+import re
 
 import httpx
 
@@ -138,8 +140,7 @@ def build_messages(article: dict, section: str):
     if section not in SECTIONS:
         raise LlmError(f"알 수 없는 섹션: {section}")
     user = (
-        f"{_article_block(article)}\n\n"
-        f"[요청]\n{SECTIONS[section]['instruction']}"
+        f"{_article_block(article)}\n\n" f"[요청]\n{SECTIONS[section]['instruction']}"
     )
     return SYSTEM_PROMPT, user
 
@@ -160,7 +161,14 @@ def build_copy_prompt(article: dict, section: str = "all") -> str:
     """
     block = _article_block(article)
     if section == "all":
-        lines = [SYSTEM_PROMPT, "", "다음 뉴스를 아래 4가지 관점에서 설명해줘.", "", block, ""]
+        lines = [
+            SYSTEM_PROMPT,
+            "",
+            "다음 뉴스를 아래 4가지 관점에서 설명해줘.",
+            "",
+            block,
+            "",
+        ]
         for i, key in enumerate(SECTION_ORDER, 1):
             lines.append(f"■ {i}. {SECTIONS[key]['label']}")
             lines.append(_copy_instruction(key))
@@ -183,6 +191,7 @@ def build_question_messages(article: dict, question: str):
 
 
 # ---------- 프로바이더 호출 ----------
+
 
 def get_model() -> str:
     return os.getenv("STUDY_MODEL", "").strip() or DEFAULT_MODEL
@@ -283,7 +292,7 @@ def _parse_all(raw: str) -> dict:
     start, end = text.find("{"), text.rfind("}")
     if start != -1 and end > start:
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start : end + 1])
         except ValueError:
             pass
     raise LlmError("통합 응답 JSON 파싱 실패")
@@ -329,3 +338,83 @@ def _normalize_terms(content: str) -> str:
     except ValueError:
         pass
     return content
+
+
+# ---------- 복사(무료) 경로 용어 파싱 ----------
+# 복사 프롬프트가 GPT에게 요청하는 형식: "- **용어**: 쉬운 설명 (예시: 예)"
+# 이 사람이-읽는 응답을 파싱해 용어장에 일괄 저장한다(_normalize_terms 는 JSON 전용).
+
+_TERMS_HEADER_RE = re.compile(r"용어\s*풀이")
+# '용어 풀이' 다음에 오는 다른 섹션 헤더(여기서 용어 섹션이 끝난다)
+_OTHER_SECTION_RE = re.compile(r"(핵심\s*요약|맥락|나에게|의미|시사)")
+# 선행 불릿/번호 1개 제거. '*' 불릿은 벗기되 '**'(굵게)는 보존.
+_LEAD_RE = re.compile(r"^[>\s]*(?:[-–—•·■◆▪●]|\*(?!\*)|\d{1,2}[.)])\s+")
+_BOLD_TERM_RE = re.compile(r"^\*\*(.+?)\*\*\s*[:：\-–]\s*(.+)$")
+_PLAIN_TERM_RE = re.compile(r"^(.{1,40}?)\s*[:：]\s*(.+)$")
+_EX_RE = re.compile(r"[（(]\s*예시?\s*[:：]?\s*(.+?)\s*[)）]\s*$")
+
+
+def _split_example(rest: str):
+    """설명 문자열 끝의 '(예시: …)' / '(예: …)' 괄호를 example 로 분리."""
+    m = _EX_RE.search(rest)
+    if m:
+        example = m.group(1).strip()
+        explanation = rest[: m.start()].rstrip(" (（").strip()
+        return explanation, example
+    return rest.strip(), None
+
+
+def parse_terms_text(text: str) -> list:
+    """복사 경로 GPT 응답(용어 섹션 또는 4섹션 전체)에서 용어를 파싱.
+
+    반환: [{ term, explanation, example }] (중복 term 제거).
+    - '용어 풀이' 헤더가 있으면 그 섹션(다음 섹션 헤더 전까지)만 대상 → 굵게 없는
+      '용어: 설명' 도 허용. 헤더가 없으면 오검출 방지를 위해 '**굵게**' 줄만 파싱.
+    """
+    if not text or not text.strip():
+        return []
+    lines = text.splitlines()
+
+    start = None
+    for i, ln in enumerate(lines):
+        if _TERMS_HEADER_RE.search(ln):
+            start = i + 1
+            break
+    if start is not None:
+        end = len(lines)
+        for j in range(start, len(lines)):
+            s = lines[j].strip()
+            if s and len(s) <= 30 and _OTHER_SECTION_RE.search(s):
+                end = j
+                break
+        region = lines[start:end]
+        allow_plain = True
+    else:
+        region = lines
+        allow_plain = False  # 전체 응답이면 굵게 줄만(요약 '무엇을:' 등 오검출 방지)
+
+    out = []
+    seen = set()
+    for ln in region:
+        s = _LEAD_RE.sub("", ln).strip()
+        if not s or s.startswith("(") or s.startswith("（"):
+            continue
+        m = _BOLD_TERM_RE.match(s)
+        if not m and allow_plain:
+            m = _PLAIN_TERM_RE.match(s)
+        if not m:
+            continue
+        term = m.group(1).strip().strip("*").strip()
+        if not term or len(term) > 40:
+            continue
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        explanation, example = _split_example(m.group(2).strip())
+        out.append({
+            "term": term,
+            "explanation": explanation or None,
+            "example": example,
+        })
+    return out

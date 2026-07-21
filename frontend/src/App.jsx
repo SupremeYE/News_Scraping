@@ -3,6 +3,7 @@ import Dashboard from "./components/Dashboard.jsx";
 import KeywordManager from "./components/KeywordManager.jsx";
 import StudyPanel from "./components/StudyPanel.jsx";
 import LibraryView from "./components/LibraryView.jsx";
+import ScrollTopButton from "./components/ScrollTopButton.jsx";
 import * as api from "./api.js";
 
 export default function App() {
@@ -80,6 +81,47 @@ export default function App() {
         res.warning
           ? `'${name}' 추가됨 (수집 경고: 확인 필요)`
           : `'${name}' 추가 · 뉴스 ${res.new_count}건 수집`
+      );
+    } catch (err) {
+      setBanner(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 뉴스레터(뉴닉) 추가 — 링크(http…)면 URL 로, 아니면 붙여넣은 본문 텍스트로.
+  const onAddNewsletter = async (value) => {
+    setBusy(true);
+    try {
+      const term = value.trim();
+      const isUrl = /^https?:\/\//i.test(term);
+      const res = await api.addNewsletter(isUrl ? { url: term } : { text: value });
+      setBanner(null);
+      // 뉴스레터는 발행일로 백필되므로, 그 발행일로 이동해 카드가 바로 보이게 한다.
+      const d = res.article?.article_date || "recent";
+      setSelectedDate(d);
+      await refreshAll(d);
+      showToast(
+        res.article ? `뉴스레터 추가 · ${res.article.title}` : "뉴스레터 추가됨"
+      );
+    } catch (err) {
+      setBanner(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 유튜브 영상 추가 — 붙여넣기(링크+자막)를 그대로 보내면 백엔드가 링크를 추출한다.
+  const onAddYoutube = async (value) => {
+    setBusy(true);
+    try {
+      const res = await api.addYoutube({ text: value });
+      setBanner(null);
+      const d = res.article?.article_date || "recent";
+      setSelectedDate(d);
+      await refreshAll(d);
+      showToast(
+        res.article ? `유튜브 추가 · ${res.article.title}` : "유튜브 영상 추가됨"
       );
     } catch (err) {
       setBanner(err.message);
@@ -203,6 +245,8 @@ export default function App() {
             keywords={keywords}
             presets={presets}
             onAddChannel={onAddChannel}
+            onAddNewsletter={onAddNewsletter}
+            onAddYoutube={onAddYoutube}
             onDelete={onDeleteKeyword}
             onFocusChannel={onFocusChannel}
             busy={busy}
@@ -236,6 +280,7 @@ export default function App() {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+      <ScrollTopButton />
     </div>
   );
 }

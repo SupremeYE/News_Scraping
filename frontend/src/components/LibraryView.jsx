@@ -18,6 +18,10 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
   const [nExp, setNExp] = useState("");
   const [nEx, setNEx] = useState("");
   const [adding, setAdding] = useState(false);
+  // GPT 응답 붙여넣어 용어 일괄 담기
+  const [bulkText, setBulkText] = useState("");
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const loadTerms = useCallback(async (query) => {
     try {
@@ -76,6 +80,23 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
       onToast && onToast(e.message || "용어 추가 실패");
     } finally {
       setAdding(false);
+    }
+  };
+
+  const importBulk = async () => {
+    const text = bulkText.trim();
+    if (!text || bulkBusy) return;
+    setBulkBusy(true);
+    try {
+      const res = await api.importTerms({ text });
+      setBulkText("");
+      setBulkOpen(false);
+      await loadTerms(q);
+      onToast && onToast(`${res.count}개 용어장에 담겼어요`);
+    } catch (e) {
+      onToast && onToast(e.message || "용어를 찾지 못했어요");
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -146,6 +167,40 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
             >
               {adding ? "추가 중…" : "+ 추가"}
             </button>
+          </div>
+
+          <div className="terms-import">
+            <button
+              className="terms-import-toggle"
+              onClick={() => setBulkOpen((v) => !v)}
+            >
+              <span className={`chevron ${bulkOpen ? "down" : "right"}`}>▸</span>
+              GPT 응답 붙여넣어 여러 개 담기
+            </button>
+            {bulkOpen && (
+              <div className="terms-import-body">
+                <p className="add-hint" style={{ margin: "0 0 8px" }}>
+                  ChatGPT/Claude에서 받은 용어 풀이(또는 전체 응답)를 붙여넣으면
+                  용어만 골라 한 번에 담습니다.
+                </p>
+                <textarea
+                  className="input"
+                  rows={5}
+                  placeholder="예) - **통관 기준 잠정치**: 세관을 통과한… (예시: …)"
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                />
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={importBulk}
+                    disabled={bulkBusy || !bulkText.trim()}
+                  >
+                    {bulkBusy ? "담는 중…" : "용어장에 담기"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {terms.length === 0 ? (

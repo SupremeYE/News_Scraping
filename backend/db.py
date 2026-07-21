@@ -371,6 +371,21 @@ def get_article(article_id: int):
         return dict(row) if row else None
 
 
+def get_article_by_link(keyword_id: int, link: str):
+    """(채널, 링크)로 방금 저장된 기사 행을 조회한다(없으면 None).
+
+    save_articles 는 신규 건수만 반환하므로, 방금 넣은 뉴스레터 기사 id/발행일을
+    회수해 프론트가 그 발행일로 이동하도록 하는 데 쓴다.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id, title, article_date FROM articles "
+            "WHERE keyword_id = ? AND link = ?",
+            (keyword_id, link),
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def save_article_body(article_id: int, body: str) -> None:
     """원문 본문을 기사에 캐시(1회 수집 후 재사용)."""
     with get_conn() as conn:

@@ -1041,51 +1041,119 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.note-item-body {
-  padding: 4px 0 4px 22px;
-  font-size: 14px;
-  line-height: 1.65;
+.note-item-body,
+.note-render {
+  font-size: 14.5px;
+  line-height: 1.8;
   color: var(--ink);
 }
+.note-item-body {
+  padding: 6px 0 6px 22px;
+}
+.study-section > .note-render {
+  margin-top: 12px;
+}
 .note-h {
-  font-weight: 700;
+  font-weight: 800;
   color: var(--primary);
-  margin: 12px 0 4px;
-  font-size: 14px;
+  margin: 18px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
 }
 .note-h1 {
-  font-size: 17px;
+  font-size: 18px;
 }
 .note-h2 {
-  font-size: 15px;
+  font-size: 16px;
 }
 .note-h3 {
-  font-size: 14px;
+  font-size: 14.5px;
 }
 .note-item-body > .note-h:first-child,
-.note-preview-box > .note-h:first-child {
+.note-preview-box > .note-h:first-child,
+.note-render > .note-h:first-child {
   margin-top: 0;
 }
 .note-li {
-  padding-left: 16px;
+  padding-left: 20px;
   position: relative;
+  margin: 5px 0;
 }
 .note-li::before {
   content: "•";
   position: absolute;
-  left: 2px;
-  color: var(--text-muted);
+  left: 4px;
+  color: var(--primary);
+}
+.note-li-num {
+  padding-left: 26px;
 }
 .note-li-num::before {
   content: attr(data-n);
-  font-size: 12px;
-  color: var(--text-muted);
+  left: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
 }
 .note-p {
   white-space: pre-wrap;
+  margin: 0 0 9px;
+}
+.note-p:last-child {
+  margin-bottom: 0;
+}
+/* 번호 섹션 제목 (1. 핵심 요약) — h3 급, 굵게 */
+.note-sec {
+  font-weight: 800;
+  color: var(--primary);
+  font-size: 16px;
+  line-height: 1.4;
+  margin: 20px 0 8px;
+}
+.note-sec-n {
+  color: var(--primary);
+}
+.note-item-body > .note-sec:first-child,
+.note-preview-box > .note-sec:first-child,
+.note-render > .note-sec:first-child {
+  margin-top: 0;
+}
+/* 소제목 (1) 왜 …) — 굵게, 살짝 들여쓰기 */
+.note-subh {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 14.5px;
+  margin: 14px 0 4px;
+  padding-left: 8px;
+}
+/* 본문/불릿 — 들여쓴 불릿(가독성) */
+.note-point {
+  position: relative;
+  padding-left: 26px;
+  margin: 5px 0;
+}
+.note-point::before {
+  content: "•";
+  position: absolute;
+  left: 10px;
+  color: var(--primary);
+}
+/* "무엇을:" 같은 레이블 강조 / "(예: …)" 예시 줄은 조용하게 */
+.note-label {
+  font-weight: 700;
+  color: var(--ink);
+}
+.note-ex {
+  margin: 2px 0 10px 26px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hairline);
+  font-size: 13px;
+  color: var(--text-muted);
 }
 .note-p a,
+.note-point a,
 .note-li a,
+.note-subh a,
 .note-h a {
   color: var(--link-blue);
   font-weight: 600;
@@ -1099,7 +1167,7 @@ button {
   margin: 10px 0;
 }
 .note-gap {
-  height: 8px;
+  height: 10px;
 }
 .note-item-actions {
   margin-top: 12px;
@@ -1125,9 +1193,82 @@ button {
   border: 1px dashed var(--hairline);
   border-radius: 12px;
   background: var(--canvas-lavender);
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 14.5px;
+  line-height: 1.8;
   color: var(--ink);
+}
+/* GPT 응답 붙여넣어 용어 일괄 담기 */
+.terms-import {
+  margin-bottom: 12px;
+  border: 1px dashed var(--hairline);
+  border-radius: 12px;
+  background: var(--canvas-cream);
+}
+.terms-import-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-align: left;
+}
+.terms-import-body {
+  padding: 0 12px 12px;
+}
+.terms-import-body textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+/* 우하단 원형 "맨 위로" 버튼 */
+.scroll-top {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--primary);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  z-index: 90;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.scroll-top:hover {
+  transform: translateY(-2px);
+}
+@media (max-width: 768px) {
+  .scroll-top {
+    right: 16px;
+    bottom: 16px;
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* 저장 직후 버튼 — 초록으로 "완료!" */
+.btn-saved {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+.btn-saved:hover {
+  background: var(--success);
+  color: #fff;
 }
 
 /* ---------- 반응형: display 계단식 축소 ---------- */

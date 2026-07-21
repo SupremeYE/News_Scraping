@@ -7,6 +7,8 @@ export default function KeywordManager({
   keywords,
   presets = [],
   onAddChannel,
+  onAddNewsletter,
+  onAddYoutube,
   onDelete,
   onFocusChannel,
   busy,
@@ -17,6 +19,20 @@ export default function KeywordManager({
   const submit = (e) => {
     e.preventDefault();
     const term = value.trim();
+    if (source === "newsletter") {
+      // 링크(http…)면 URL 로, 아니면 붙여넣은 본문 텍스트로 처리.
+      if (!term) return;
+      onAddNewsletter && onAddNewsletter(term);
+      setValue("");
+      return;
+    }
+    if (source === "youtube") {
+      // 붙여넣기(링크+자막)를 그대로 전달 — 백엔드가 링크를 추출한다.
+      if (!term) return;
+      onAddYoutube && onAddYoutube(value);
+      setValue("");
+      return;
+    }
     if (source === "naver") {
       if (!term) return;
       onAddChannel({ keyword: term, kind: "naver" });
@@ -39,9 +55,16 @@ export default function KeywordManager({
 
   const isNaver = source === "naver";
   const isBoannews = source === "boannews";
-  const isRss = !isNaver && !isBoannews;
+  const isNewsletter = source === "newsletter";
+  const isYoutube = source === "youtube";
+  const isPaste = isNewsletter || isYoutube; // 넓은 붙여넣기(textarea)를 쓰는 출처
+  const isRss = !isNaver && !isBoannews && !isNewsletter && !isYoutube;
 
-  const placeholder = isBoannews
+  const placeholder = isYoutube
+    ? "유튜브 링크를 붙여넣으면 자막을 자동으로 가져옵니다. (자동이 안 되면 자막을 복사해 아래에 함께 붙여넣어도 됩니다)"
+    : isNewsletter
+    ? "뉴닉 공유 링크(stibee)를 붙여넣으세요. 링크가 없으면 본문 전체를 붙여넣어도 됩니다."
+    : isBoannews
     ? "보안뉴스에서 검색할 키워드 예: 취약점, 랜섬웨어…"
     : isRss
     ? `${source} 안에서 볼 키워드 (예: KISA · 비우면 전체)`
@@ -60,6 +83,8 @@ export default function KeywordManager({
           title="출처 선택"
         >
           <option value="naver">네이버</option>
+          <option value="newsletter">뉴닉 뉴스레터</option>
+          <option value="youtube">유튜브 영상</option>
           <option value="boannews">보안뉴스 검색</option>
           {presets.map((p) => (
             <option key={p.name} value={p.name}>
@@ -67,21 +92,33 @@ export default function KeywordManager({
             </option>
           ))}
         </select>
-        <input
-          className="input"
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          disabled={busy}
-        />
+        {isPaste ? (
+          <textarea
+            className="input"
+            rows={2}
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={busy}
+          />
+        ) : (
+          <input
+            className="input"
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={busy}
+          />
+        )}
         <button className="btn btn-primary" type="submit" disabled={busy}>
           추가
         </button>
       </form>
       <p className="add-hint">
-        <b>네이버</b>는 여러 매체에서 검색, <b>보안뉴스 검색</b>은 보안뉴스 최근 기사에서
-        키워드 매칭(사이트 검색), <b>RSS</b>는 그 매체의 최신 헤드라인 수집입니다.
-        키워드마다 별도 블럭으로 쌓입니다.
+        <b>네이버</b>는 여러 매체에서 검색, <b>뉴닉 뉴스레터</b>는 공유 링크(또는 본문)를
+        붙여넣어 저장, <b>유튜브 영상</b>은 링크만 붙여넣으면 자막을 자동으로 받아 학습,
+        <b>보안뉴스 검색</b>은 보안뉴스 최근 기사에서 키워드 매칭, <b>RSS</b>는 그 매체의
+        최신 헤드라인 수집입니다. 키워드마다 별도 블럭으로 쌓입니다.
       </p>
 
       {keywords.length === 0 ? (
@@ -91,20 +128,27 @@ export default function KeywordManager({
       ) : (
         <div className="chips">
           {keywords.map((k) => {
+            const isNews = k.kind === "newsletter";
+            const isVid = k.kind === "youtube";
             const tagged = k.kind === "rss" || k.kind === "boannews";
+            const showTag = tagged || isNews || isVid;
             const tagLabel =
               k.kind === "boannews"
                 ? `${k.source_label || "보안뉴스"} 검색`
+                : isNews
+                ? "뉴스레터"
+                : isVid
+                ? "유튜브"
                 : `${k.source_label || "RSS"} RSS`;
             return (
-            <span className={`chip ${tagged ? "chip-rss" : ""}`} key={k.id}>
+            <span className={`chip ${showTag ? "chip-rss" : ""}`} key={k.id}>
               <button
                 type="button"
                 className="chip-label"
                 title="이 채널로 이동"
                 onClick={() => onFocusChannel && onFocusChannel(k.id)}
               >
-                {tagged && <span className="chip-tag">{tagLabel}</span>}
+                {showTag && <span className="chip-tag">{tagLabel}</span>}
                 {tagged ? k.filter_kw || "전체" : k.keyword}
               </button>
               <button

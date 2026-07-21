@@ -29,7 +29,9 @@ import extract
 import llm
 from boannews import BoannewsError, search_boannews
 from naver import NaverApiError, NaverCredentialsError, fetch_news
+from newsletter import NewsletterError, fetch_newsletter
 from rss import RssError, fetch_rss
+from youtube import YoutubeError, fetch_youtube, find_url
 
 scheduler = BackgroundScheduler()
 
@@ -88,6 +90,9 @@ def fetch_all_keywords() -> dict:
                 articles = fetch_rss(kw["feed_url"])
             elif kw["kind"] == "boannews":
                 articles = search_boannews(kw["filter_kw"] or "")
+            elif kw["kind"] in ("newsletter", "youtube"):
+                # 뉴스레터/유튜브는 사용자가 직접 추가(자동 수집 대상 아님) → 건너뛴다.
+                continue
             else:
                 articles = fetch_news(name)
         except NaverCredentialsError as e:
@@ -153,6 +158,17 @@ class KeywordIn(BaseModel):
     kind: str = "naver"           # 'naver' | 'rss' | 'boannews'
     feed_url: str | None = None   # kind='rss' 일 때 필수
     source_label: str | None = None  # kind='rss' 출처명(예: '보안뉴스')
+
+
+class NewsletterIn(BaseModel):
+    url: str | None = None    # 뉴스레터 공개 공유 링크(예: Stibee) — 붙여넣으면 본문 자동 추출
+    text: str | None = None   # (폴백) 본문 텍스트를 직접 붙여넣기
+    title: str | None = None  # (선택) 붙여넣기 경로에서 제목 지정
+
+
+class YoutubeIn(BaseModel):
+    url: str | None = None    # 영상 링크(제목/작성자 자동). text 안에 섞여 있어도 추출됨
+    text: str | None = None   # 브라우저(확장프로그램/스크립트 표시)에서 복사한 자막 = 학습 본문
 
 
 class FilterIn(BaseModel):
@@ -226,6 +242,93 @@ def create_keyword(payload: KeywordIn):
     return {"keyword": row, "created": created, "new_count": new_count, "warning": warning}
 
 
+NEWSLETTER_CHANNEL = "뉴닉"  # 뉴스레터 이슈들을 담는 컨테이너 채널 표시명
+
+
+@app.post("/api/newsletter")
+def add_newsletter(payload: NewsletterIn):
+    """뉴스레터 이슈 1건을 기사로 저장한다.
+
+    - url(공유 링크)이면 fetch_newsletter 로 본문 자동 추출.
+    - text(붙여넣기)면 그 텍스트를 본문으로 사용(추출 실패 대비 폴백).
+    저장 후 그 기사의 발행일/id 를 돌려줘 프론트가 해당 발행일로 이동하게 한다.
+    """
+    url = (payload.url or "").strip()
+    text = (payload.text or "").strip()
+    if not url and not text:
+        raise HTTPException(status_code=400, detail="뉴스레터 링크(URL) 또는 본문 텍스트를 입력하세요.")
+
+    # 뉴스레터 컨테이너 채널을 find-or-create(이미 있으면 재사용).
+    channel, _ = db.add_keyword(
+        NEWSLETTER_CHANNEL, kind="newsletter", source_label=NEWSLETTER_CHANNEL
+    )
+
+    if url and url.lower().startswith("http"):
+        try:
+            article = fetch_newsletter(url)
+        except NewsletterError as e:
+            raise HTTPException(status_code=502, detail=str(e))
+        if text:  # 링크와 본문을 함께 주면 붙여넣은 본문을 우선(추출 품질 보정).
+            article["body"] = text
+    else:
+        # 붙여넣기 경로: 본문 텍스트만으로 기사 구성. 링크는 (제목+오늘)로 합성해 중복만 방지.
+        body = text or url
+        title = (payload.title or "").strip() or (body.splitlines()[0][:80] if body else "뉴닉 뉴스레터")
+        today = date.today().isoformat()
+        article = {
+            "title": title,
+            "link": f"newsletter://{NEWSLETTER_CHANNEL}/{today}/{title}",
+            "description": body[:200].replace("\n", " ").strip(),
+            "pub_date": today,
+            "source": NEWSLETTER_CHANNEL,
+            "body": body,
+        }
+
+    body = article.pop("body", "") or ""
+    db.save_articles(channel["id"], [article])
+    row = db.get_article_by_link(channel["id"], article["link"])
+    if row and body:
+        db.save_article_body(row["id"], body)
+
+    return {
+        "article": row,  # { id, title, article_date } | None
+        "channel": channel,
+    }
+
+
+YOUTUBE_CHANNEL = "유튜브"  # 유튜브 영상들을 담는 컨테이너 채널 표시명
+
+
+@app.post("/api/youtube")
+def add_youtube(payload: YoutubeIn):
+    """유튜브 영상 1건을 자막 기반 기사로 저장한다.
+
+    입력은 붙여넣기 하나로 충분하다(text): 유튜브 링크 + 자막이 섞여 있어도 링크는 자동
+    추출하고 나머지를 자막(본문)으로 쓴다. 링크로 제목/작성자를 채우고, 자막으로 학습한다.
+    """
+    raw = (payload.text or "").strip()
+    url = (payload.url or "").strip() or find_url(raw)
+    transcript = raw.replace(url, "").strip() if url else raw
+    if not transcript and not url:
+        raise HTTPException(status_code=400, detail="유튜브 링크 또는 자막 텍스트를 입력하세요.")
+
+    channel, _ = db.add_keyword(
+        YOUTUBE_CHANNEL, kind="youtube", source_label=YOUTUBE_CHANNEL
+    )
+    try:
+        article = fetch_youtube(url, transcript)
+    except YoutubeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    body = article.pop("body", "") or ""
+    db.save_articles(channel["id"], [article], date.today().isoformat())
+    row = db.get_article_by_link(channel["id"], article["link"])
+    if row and body:
+        db.save_article_body(row["id"], body)
+
+    return {"article": row, "channel": channel}
+
+
 @app.patch("/api/keywords/{keyword_id}")
 def update_keyword_filter(keyword_id: int, payload: FilterIn):
     """채널(주로 RSS)의 표시 필터 키워드를 설정/해제한다."""
@@ -295,6 +398,11 @@ class TermIn(BaseModel):
     explanation: str | None = None
     example: str | None = None
     article_id: int | None = None
+
+
+class TermsImportIn(BaseModel):
+    text: str = ""                    # GPT 응답(용어 섹션 또는 4섹션 전체) 붙여넣기
+    article_id: int | None = None     # 어느 기사에서 나온 용어인지(선택)
 
 
 class NoteIn(BaseModel):
@@ -437,6 +545,22 @@ def add_term(payload: TermIn):
     if not term:
         raise HTTPException(status_code=400, detail="용어를 입력하세요.")
     return db.upsert_term(term, payload.explanation, payload.example, payload.article_id)
+
+
+@app.post("/api/glossary/import")
+def import_terms(payload: TermsImportIn):
+    """붙여넣은 GPT 응답(복사 경로)에서 용어를 파싱해 용어장에 일괄 저장한다."""
+    parsed = llm.parse_terms_text(payload.text or "")
+    if not parsed:
+        raise HTTPException(
+            status_code=422,
+            detail="용어를 찾지 못했습니다. GPT 응답의 '용어 풀이' 부분을 붙여넣어 주세요.",
+        )
+    saved = [
+        db.upsert_term(t["term"], t.get("explanation"), t.get("example"), payload.article_id)
+        for t in parsed
+    ]
+    return {"count": len(saved), "terms": saved}
 
 
 @app.delete("/api/glossary/{term_id}")

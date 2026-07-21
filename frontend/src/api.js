@@ -32,6 +32,16 @@ export const addChannel = (payload) =>
 export const deleteKeyword = (id) =>
   req(`/keywords/${id}`, { method: "DELETE" });
 
+// 뉴스레터(뉴닉) 이슈 1건 추가. payload: { url } 또는 { text, title? }
+// 반환: { article: { id, title, article_date } | null, channel }
+export const addNewsletter = (payload) =>
+  req("/newsletter", { method: "POST", body: JSON.stringify(payload) });
+
+// 유튜브 영상 1건 추가. payload: { text } (링크+자막을 함께 붙여넣어도 됨)
+// 반환: { article: { id, title, article_date } | null, channel }
+export const addYoutube = (payload) =>
+  req("/youtube", { method: "POST", body: JSON.stringify(payload) });
+
 // 드래그로 정한 순서 저장. order: 채널 id 배열(원하는 표시 순서)
 export const reorderChannels = (order) =>
   req(`/keywords/reorder`, {
@@ -86,6 +96,10 @@ export const getGlossary = (q) =>
 
 export const addTerm = (payload) =>
   req("/glossary", { method: "POST", body: JSON.stringify(payload) });
+
+// GPT 응답(용어 섹션/전체)을 붙여넣어 용어를 일괄 저장. { count, terms }
+export const importTerms = (payload) =>
+  req("/glossary/import", { method: "POST", body: JSON.stringify(payload) });
 
 export const deleteTerm = (id) =>
   req(`/glossary/${id}`, { method: "DELETE" });

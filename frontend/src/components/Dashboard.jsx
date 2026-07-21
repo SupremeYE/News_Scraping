@@ -95,6 +95,10 @@ export default function Dashboard({
             ? `${g.source_label || "보안뉴스"} 검색`
             : g.kind === "rss"
             ? `${g.source_label || "RSS"} RSS`
+            : g.kind === "newsletter"
+            ? "뉴스레터"
+            : g.kind === "youtube"
+            ? "유튜브"
             : null;
         const cls =
           `panel ${isOpen ? "open" : "closed"}` +

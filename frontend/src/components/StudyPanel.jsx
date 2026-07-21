@@ -46,6 +46,7 @@ export default function StudyPanel({
 
   const [note, setNote] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false); // 저장 직후 "완료!" 표시(잠깐)
   const [notePreviewOn, setNotePreviewOn] = useState(false);
   const noteDirty = useRef(false); // 사용자가 노트를 편집했는지(비동기 로드 덮어쓰기 방지)
 
@@ -147,7 +148,9 @@ export default function StudyPanel({
       setNoteSaving(true);
       try {
         await api.putNote(articleId, body);
-        onToast("노트에 저장됨");
+        onToast("저장되었습니다 ✓");
+        setNoteSaved(true);
+        setTimeout(() => setNoteSaved(false), 1800);
       } catch (e) {
         setWarning(e.message);
       } finally {
@@ -196,6 +199,17 @@ export default function StudyPanel({
       } catch (e) {
         setWarning(e.message);
       }
+    },
+    [articleId, onToast, onGlossaryChange]
+  );
+
+  // GPT 응답(복사 경로)을 붙여넣어 용어를 일괄 저장. 성공 건수를 반환.
+  const importTerms = useCallback(
+    async (text) => {
+      const res = await api.importTerms({ text, article_id: articleId });
+      onToast(`${res.count}개 용어장에 담겼어요`);
+      onGlossaryChange && onGlossaryChange();
+      return res.count;
     },
     [articleId, onToast, onGlossaryChange]
   );
@@ -325,6 +339,7 @@ export default function StudyPanel({
               onCopy={() => copyPrompt(tab)}
               onSaveNote={() => appendToNote(tab)}
               onSaveTerm={saveTerm}
+              onImportTerms={importTerms}
             />
           )}
 
@@ -360,7 +375,9 @@ export default function StudyPanel({
               </div>
               {answer && (
                 <>
-                  <div className="study-content study-answer">{answer}</div>
+                  <div className="study-answer note-render">
+                    {renderNoteBody(answer)}
+                  </div>
                   <div className="study-note-actions">
                     <button
                       className="btn btn-sm"
@@ -400,11 +417,11 @@ export default function StudyPanel({
               />
               <div className="study-note-actions">
                 <button
-                  className="btn btn-primary btn-sm"
+                  className={`btn btn-sm ${noteSaved ? "btn-saved" : "btn-primary"}`}
                   onClick={() => saveNote(note)}
                   disabled={noteSaving}
                 >
-                  {noteSaving ? "저장 중…" : "노트 저장"}
+                  {noteSaving ? "저장 중…" : noteSaved ? "✓ 완료!" : "노트 저장"}
                 </button>
                 <button
                   className="btn btn-sm"
@@ -441,9 +458,65 @@ function SectionView({
   onCopy,
   onSaveNote,
   onSaveTerm,
+  onImportTerms,
 }) {
+  const [importText, setImportText] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const runImport = async () => {
+    const text = importText.trim();
+    if (!text || importing) return;
+    setImporting(true);
+    try {
+      const n = await onImportTerms(text);
+      if (n > 0) {
+        setImportText("");
+        setImportOpen(false);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div className="study-section">
+      {section === "terms" && (
+        <div className="terms-import">
+          <button
+            className="terms-import-toggle"
+            onClick={() => setImportOpen((v) => !v)}
+          >
+            <span className={`chevron ${importOpen ? "down" : "right"}`}>▸</span>
+            GPT 응답 붙여넣어 용어장에 담기
+          </button>
+          {importOpen && (
+            <div className="terms-import-body">
+              <p className="study-qa-hint">
+                프롬프트를 복사해 ChatGPT/Claude에서 받은 답을 그대로 붙여넣으세요.
+                (용어 부분만, 또는 전체 응답을 붙여넣어도 용어만 골라 담습니다.)
+              </p>
+              <textarea
+                className="input"
+                rows={5}
+                placeholder="예) - **통관 기준 잠정치**: 세관을 통과한… (예시: …)"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+              />
+              <div className="study-note-actions">
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={runImport}
+                  disabled={importing || !importText.trim()}
+                >
+                  {importing ? "담는 중…" : "용어장에 담기"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="study-section-actions">
         <button
           className="btn btn-primary btn-sm"
@@ -496,7 +569,7 @@ function SectionView({
       )}
 
       {!loading && content && !(section === "terms" && terms) && (
-        <div className="study-content">{content}</div>
+        <div className="note-render">{renderNoteBody(content)}</div>
       )}
     </div>
   );

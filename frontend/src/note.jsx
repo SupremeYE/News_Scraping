@@ -6,6 +6,25 @@
 const IMG_MD_RE = /^!\[([^\]]*)\]\(([^)]+)\)$/; // ![alt](url)
 const IMG_URL_RE = /^(https?:\/\/\S+\.(?:png|jpe?g|gif|webp|svg))(\?\S*)?$/i;
 const INLINE_RE = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+// "무엇을: …", "통관 기준 잠정치: …" 처럼 짧은 레이블로 시작하는 줄 → 레이블만 강조.
+const LABEL_RE = /^([^:：*[\]]{1,24})([:：])\s+(\S.*)$/;
+// "(예: …)" 예시 줄
+const EX_RE = /^\(\s*예/;
+
+// 레이블(무엇을:) 이 있으면 굵게, 없으면 그냥 인라인 렌더.
+function renderLead(text, key) {
+  const m = text.match(LABEL_RE);
+  if (m) {
+    return [
+      <strong className="note-label" key={`${key}-lb`}>
+        {m[1]}
+        {m[2]}{" "}
+      </strong>,
+      ...[].concat(renderInline(m[3], key)),
+    ];
+  }
+  return renderInline(text, key);
+}
 
 // 한 줄 안의 **굵게** / [링크](url) 를 React 노드 배열로.
 function renderInline(text, keyPrefix) {
@@ -68,23 +87,33 @@ export function renderNoteBody(body) {
       return;
     }
 
-    // 번호 목록 (1. 항목) — 1~2자리만(연도 "2026." 오인 방지)
-    const ol = t.match(/^(\d{1,2})\.\s+(.*)$/);
-    if (ol) {
+    // 번호 제목 (1. 핵심 요약) → 섹션 제목(크게·굵게). 1~2자리만(연도 "2026." 오인 방지)
+    const sec = t.match(/^(\d{1,2})\.\s+(.*)$/);
+    if (sec) {
       out.push(
-        <div className="note-li note-li-num" key={key} data-n={`${ol[1]}.`}>
-          {renderInline(ol[2], key)}
+        <div className="note-sec" key={key}>
+          <span className="note-sec-n">{sec[1]}.</span> {renderInline(sec[2], key)}
         </div>
       );
       return;
     }
 
-    // 불릿 목록 (- 항목, * 항목)
-    const ul = t.match(/^[-*]\s+(.*)$/);
-    if (ul) {
+    // 소제목 (1) 왜 …) → 굵게
+    const sub = t.match(/^(\d{1,2})\)\s+(.*)$/);
+    if (sub) {
       out.push(
-        <div className="note-li" key={key}>
-          {renderInline(ul[1], key)}
+        <div className="note-subh" key={key}>
+          {sub[1]}) {renderInline(sub[2], key)}
+        </div>
+      );
+      return;
+    }
+
+    // 예시 줄 "(예: …)" — 눈에 덜 띄게 별도 스타일.
+    if (EX_RE.test(t)) {
+      out.push(
+        <div className="note-ex" key={key}>
+          {renderInline(t, key)}
         </div>
       );
       return;
@@ -95,9 +124,11 @@ export function renderNoteBody(body) {
       return;
     }
 
+    // 불릿 목록(- 항목, * 항목) + 일반 본문 → 들여쓴 불릿으로 통일(가독성).
+    const ul = t.match(/^[-*]\s+(.*)$/);
     out.push(
-      <div className="note-p" key={key}>
-        {renderInline(line, key)}
+      <div className="note-point" key={key}>
+        {renderLead(ul ? ul[1] : t, key)}
       </div>
     );
   });
