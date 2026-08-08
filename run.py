@@ -92,8 +92,11 @@ def main():
     # 4) 백엔드 실행 (cwd=backend 필수: .env / news.db 가 상대경로)
     info(f"서버 시작 → {URL}")
     child_env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    # --host 0.0.0.0: localhost 뿐 아니라 LAN/Tailscale IP 로도 접속 허용
+    # (아이폰 등 다른 기기에서 접속하려면 필수). 보안은 Tailscale 사설망이 담당.
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--port", str(PORT)],
+        [sys.executable, "-m", "uvicorn", "main:app",
+         "--host", "0.0.0.0", "--port", str(PORT)],
         cwd=BACKEND,
         env=child_env,
     )

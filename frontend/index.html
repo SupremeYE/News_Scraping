@@ -2,11 +2,41 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: 노치 영역까지 채우고, 안전영역은 CSS env() 로 피한다 -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <title>뉴스 대시보드</title>
+
+    <!-- PWA: 설치·테마·아이콘 -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="관심 키워드·채널 뉴스를 모아보고 AI로 공부하는 대시보드" />
+
+    <!-- iOS 홈 화면 추가(standalone 전체화면 + 아이콘 + 상태바) -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="뉴스" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- 서비스워커 등록: secure context(Tailscale HTTPS)에서만 활성화.
+         LAN http/dev 에서는 navigator.serviceWorker 가 없어 조용히 건너뛴다. -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .catch(function (err) {
+              console.warn("서비스워커 등록 실패:", err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

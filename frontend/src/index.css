@@ -1271,25 +1271,248 @@ button {
   color: #fff;
 }
 
-/* ---------- 반응형: display 계단식 축소 ---------- */
+/* ---------- 반응형: 태블릿/모바일 ---------- */
 @media (max-width: 768px) {
+  /* 노치·홈 인디케이터를 피해 여백 확보(홈 화면 추가 시 전체화면이 되므로 필수) */
+  .app {
+    padding: 16px calc(14px + env(safe-area-inset-right))
+      calc(48px + env(safe-area-inset-bottom))
+      calc(14px + env(safe-area-inset-left));
+  }
+  /* iOS Safari 에서 fixed 배경은 스크롤 시 튀므로 모바일에선 해제 */
+  body {
+    background-attachment: scroll;
+  }
+
+  /* iOS 는 폰트가 16px 미만인 입력에 포커스하면 화면을 확대해버린다.
+     확대되면 레이아웃이 틀어지고 되돌아오지 않으므로 모두 16px 로 고정. */
+  .input,
+  .select,
+  textarea,
+  .study-note-area,
+  .study-prompt-box textarea,
+  .terms-import-body textarea,
+  .term-add-form .input {
+    font-size: 16px;
+  }
+
+  /* 상단바: 제목 한 줄, 컨트롤은 아래 줄에서 가로 폭을 나눠 쓴다 */
+  .topbar {
+    gap: 10px;
+  }
   .topbar h1 {
-    font-size: 28px;
+    font-size: 24px;
+    gap: 8px;
+  }
+  .topbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .view-switch {
+    flex: 1 1 100%;
+  }
+  .view-btn {
+    flex: 1;
+    justify-content: center;
+    text-align: center;
+  }
+  .topbar-actions .select {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  .topbar-actions .btn {
+    flex: 0 0 auto;
   }
   .subtitle {
     font-size: 12px;
     white-space: normal; /* 좁은 화면에선 줄바꿈 허용(잘림 방지) */
     overflow: visible;
+    margin-bottom: 18px;
+  }
+
+  /* 채널 추가: 한 줄에 select+input+버튼은 폰 폭에서 불가능 → 세로로 쌓는다 */
+  .keyword-manager {
+    padding: 16px;
+  }
+  .keyword-add {
+    flex-direction: column;
+  }
+  .keyword-add .select,
+  .keyword-add .input,
+  .keyword-add .btn {
+    width: 100%;
+  }
+  .filter-row-name {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .term-add-form .input {
+    flex: 1 1 100%;
+  }
+
+  /* 패널: 여백을 줄여 카드 폭을 확보 */
+  .panel-header {
+    padding: 16px 14px;
+    gap: 8px;
+  }
+  .panel-body {
+    padding: 4px 14px 18px;
   }
   .panel-title {
-    font-size: 20px;
+    font-size: 18px;
   }
+  .drag-grip {
+    padding: 0 4px 0 8px;
+  }
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .news-card {
+    padding: 16px;
+  }
+
+  /* 학습 노트 뷰 */
+  .lib-block {
+    padding: 16px;
+  }
+  .lib-head {
+    flex-wrap: wrap;
+  }
+  .lib-search {
+    margin-left: 0;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+  .lib-tabs {
+    overflow-x: auto;
+  }
+  .lib-tab {
+    flex: 0 0 auto;
+  }
+  /* 목록 제목은 한 줄 자르기 대신 두 줄까지 — 폰에선 너무 많이 잘린다 */
+  .note-item-head {
+    flex-wrap: wrap;
+  }
+  .note-item-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .note-preview {
+    padding-left: 0;
+  }
+  .note-item-body {
+    padding-left: 0;
+  }
+
+  /* 스터디 모달: 폰에선 전체화면 시트 */
   .study-overlay {
     padding: 0;
   }
   .study-modal {
     max-width: 100%;
-    min-height: 100%;
+    min-height: 100dvh;
     border-radius: 0;
+  }
+  .study-head {
+    padding: 16px 14px 12px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+  }
+  .study-title {
+    font-size: 17px;
+  }
+  .study-actions-top,
+  .study-tabs,
+  .study-body,
+  .study-warning,
+  .study-prompt-box {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .study-warning,
+  .study-prompt-box {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .study-body {
+    padding-bottom: calc(26px + env(safe-area-inset-bottom));
+  }
+  /* 탭 6개가 줄바꿈되면 헤더가 3줄이 된다 → 가로 스크롤 한 줄로 */
+  .study-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .study-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .study-tab {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+  }
+  /* 질문 입력은 한 줄 전체, 버튼은 그 아래 */
+  .study-qa-row {
+    flex-wrap: wrap;
+  }
+  .study-qa-row .input {
+    flex: 1 1 100%;
+  }
+
+  /* 토스트가 화면 폭을 넘지 않도록 */
+  .toast {
+    left: 14px;
+    right: 14px;
+    transform: none;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    text-align: center;
+    font-size: 14px;
+    padding: 12px 16px;
+  }
+  .scroll-top {
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    width: 42px;
+    height: 42px;
+  }
+}
+
+/* 아주 좁은 폰(≤430px): 카드/용어는 1열 */
+@media (max-width: 430px) {
+  .card-grid,
+  .term-grid {
+    grid-template-columns: 1fr;
+  }
+  .topbar h1 {
+    font-size: 22px;
+  }
+}
+
+/* ---------- 터치 기기: hover 로만 보이던 것들을 항상 노출 ---------- */
+@media (hover: none) {
+  /* 손가락엔 hover 가 없어 "클릭해서 학습" 힌트가 영영 안 보인다 */
+  .card-study-hint {
+    opacity: 1;
+  }
+  /* 탭 후 hover 상태가 눌린 채 남는(sticky hover) 현상 방지 */
+  .news-card:hover {
+    transform: none;
+    box-shadow: var(--shadow);
+    border-color: var(--hairline);
+  }
+  .panel-header:hover {
+    background: transparent;
+  }
+  /* 최소 탭 영역 확보(애플 권장 44px 에 근접하게) */
+  .chip button:not(.chip-label),
+  .term-del {
+    width: 32px;
+    height: 32px;
+  }
+  .study-close {
+    width: 40px;
+    height: 40px;
   }
 }
