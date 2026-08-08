@@ -185,9 +185,16 @@ def build_copy_prompt(article: dict, section: str = "all") -> str:
             "",
         ]
         for i, key in enumerate(SECTION_ORDER, 1):
-            lines.append(f"■ {i}. {SECTIONS[key]['label']}")
+            # 섹션 머리는 마크다운 '##' 로 낸다. 챗이 이 형식을 그대로 따라 쓰는데,
+            # 그 답을 노트에 붙여넣었을 때 note.jsx 가 제목으로 렌더한다.
+            # (예전 '■ N.' 형식은 어떤 규칙에도 안 걸려 통짜 문단으로 보였다.)
+            lines.append(f"## {i}. {SECTIONS[key]['label']}")
             lines.append(_copy_instruction(key))
             lines.append("")
+        lines.append(
+            "답변도 위와 같은 형식으로, 각 섹션 제목을 '## 1. 핵심 요약' 처럼 "
+            "마크다운 제목으로 달아줘."
+        )
         return "\n".join(lines).strip()
     if section not in SECTIONS:
         raise LlmError(f"알 수 없는 섹션: {section}")

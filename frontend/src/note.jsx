@@ -1,11 +1,20 @@
 // 스터디 노트 본문의 마크다운-라이트 렌더러(공유). 라이브러리 없이 정규식 기반.
-// 지원: # / ## / ### 제목, - · * 불릿, 1. 번호목록, **굵게**, [텍스트](url),
-//       ![alt](url) 또는 이미지 확장자 URL 단독 줄 → 이미지.
+// 지원: # ~ ###### 제목, - · * 불릿, 1. 번호목록, 1) 소제목, **굵게**, [텍스트](url),
+//       ![alt](url) 또는 이미지 확장자 URL 단독 줄 → 이미지, --- 구분선,
+//       **제목**만 있는 줄 → 소제목.
 // LibraryView(노트 펼침 렌더)와 StudyPanel(내 노트 미리보기)에서 함께 쓴다.
 
 const IMG_MD_RE = /^!\[([^\]]*)\]\(([^)]+)\)$/; // ![alt](url)
 const IMG_URL_RE = /^(https?:\/\/\S+\.(?:png|jpe?g|gif|webp|svg))(\?\S*)?$/i;
 const INLINE_RE = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+// 줄머리 장식 기호. 복사 프롬프트가 섹션을 "■ 1. 핵심 요약" 으로 표시하는데 챗이
+// 이 기호를 그대로 따라 쓰는 일이 잦다. 떼고 판정해야 "1." 이 섹션 제목으로 잡힌다.
+// ('-'·'*' 는 불릿 규칙이 따로 처리하므로 여기 넣지 않는다.)
+const DECOR_RE = /^[■◆▪●▶◦□▷※]\s*/;
+// 구분선(---, ***, ⸻ …) — 챗 응답이 섹션 사이에 자주 넣는다.
+const HR_RE = /^(-{3,}|\*{3,}|_{3,}|—{2,}|⸻+)$/;
+// 줄 전체가 **굵게** 인 경우 → 소제목으로 본다(챗이 제목을 굵게만 쓰는 경우가 많다).
+const BOLD_ONLY_RE = /^\*\*([^*]+)\*\*[:：]?$/;
 // "무엇을: …", "통관 기준 잠정치: …" 처럼 짧은 레이블로 시작하는 줄 → 레이블만 강조.
 const LABEL_RE = /^([^:：*[\]]{1,24})([:：])\s+(\S.*)$/;
 // "(예: …)" 예시 줄
@@ -61,7 +70,9 @@ export function renderNoteBody(body) {
   const lines = (body || "").split("\n");
   const out = [];
   lines.forEach((line, i) => {
-    const t = line.trim();
+    const raw = line.trim();
+    const decorated = DECOR_RE.test(raw); // '■ 1. 핵심 요약' 처럼 장식 기호가 붙었나
+    const t = raw.replace(DECOR_RE, "");
     const key = `l${i}`;
 
     // 이미지 (마크다운 또는 이미지 URL 단독 줄)
@@ -76,12 +87,30 @@ export function renderNoteBody(body) {
       return;
     }
 
-    // 제목 (#, ##, ###)
-    const h = t.match(/^(#{1,3})\s+(.*)$/);
+    // 구분선 (---, ***, ⸻)
+    if (HR_RE.test(t)) {
+      out.push(<hr className="note-hr" key={key} />);
+      return;
+    }
+
+    // 제목 (# ~ ######). 4단계 이상은 h3 스타일로 묶는다(챗이 #### 를 자주 쓴다).
+    const h = t.match(/^(#{1,6})\s+(.*)$/);
     if (h) {
       out.push(
-        <div className={`note-h note-h${h[1].length}`} key={key}>
+        <div className={`note-h note-h${Math.min(h[1].length, 3)}`} key={key}>
           {renderInline(h[2], key)}
+        </div>
+      );
+      return;
+    }
+
+    // '■ 1. 핵심 요약' — 장식 기호 + 번호는 최상위 섹션 머리로 본다. 이렇게 해야
+    // 그 안의 '1. 왜 지금…' 하위 항목과 크기가 구분돼 계층이 보인다.
+    // ('● 항목' 처럼 번호 없는 장식 줄은 그냥 불릿이므로 여기 걸리지 않는다.)
+    if (decorated && /^\d{1,2}[.)]\s+/.test(t)) {
+      out.push(
+        <div className="note-h note-h2" key={key}>
+          {renderInline(t, key)}
         </div>
       );
       return;
@@ -104,6 +133,17 @@ export function renderNoteBody(body) {
       out.push(
         <div className="note-subh" key={key}>
           {sub[1]}) {renderInline(sub[2], key)}
+        </div>
+      );
+      return;
+    }
+
+    // 줄 전체가 **굵게** 뿐이면 소제목으로.
+    const boldOnly = t.match(BOLD_ONLY_RE);
+    if (boldOnly) {
+      out.push(
+        <div className="note-subh" key={key}>
+          {boldOnly[1]}
         </div>
       );
       return;
@@ -141,7 +181,9 @@ export function notePreview(body, max = 120) {
     .replace(/!\[[^\]]*\]\([^)]+\)/g, "") // 이미지 제거
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // 링크 → 텍스트
     .replace(/\*\*([^*]+)\*\*/g, "$1") // 굵게 → 텍스트
-    .replace(/^#{1,3}\s+/gm, "")
+    .replace(/^\s*[■◆▪●▶◦□▷※]\s*/gm, "") // 줄머리 장식 기호
+    .replace(/^\s*(-{3,}|\*{3,}|_{3,}|—{2,}|⸻+)\s*$/gm, "") // 구분선
+    .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\d{1,2}\.\s+/gm, "")
     .replace(/^[-*]\s+/gm, "")
     .replace(/\s+/g, " ")

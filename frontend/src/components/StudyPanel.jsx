@@ -457,8 +457,11 @@ export default function StudyPanel({
                 <br />
                 <span className="note-syntax">
                   지원: <code>## 제목</code> · <code>- 목록</code> ·{" "}
-                  <code>1. 번호</code> · <code>**굵게**</code> ·{" "}
+                  <code>1. 번호</code> · <code>1) 소제목</code> ·{" "}
+                  <code>**굵게**</code> · <code>---</code> ·{" "}
                   <code>[링크](url)</code> · <code>![](이미지url)</code>
+                  <br />
+                  ChatGPT 답변을 그대로 붙여넣어도 제목·목록이 인식됩니다.
                 </span>
               </p>
               <textarea
