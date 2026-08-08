@@ -96,7 +96,7 @@ export default function Dashboard({
             : g.kind === "rss"
             ? `${g.source_label || "RSS"} RSS`
             : g.kind === "newsletter"
-            ? "뉴스레터"
+            ? "저장"
             : g.kind === "youtube"
             ? "유튜브"
             : null;

@@ -1,4 +1,7 @@
-"""뉴스레터(뉴닉 등) 수집기 — 공개 웹 공유 링크에서 본문을 뽑아 기사 dict로 정규화.
+"""링크 저장 수집기 — 임의의 웹 링크에서 본문을 뽑아 기사 dict로 정규화.
+
+원래 뉴닉 뉴스레터 전용이었으나(모듈명은 그대로), 지금은 **아무 기사 링크나** 받아
+저장하는 범용 경로다. 서버 렌더 페이지면 대부분 동작한다(예: 안랩 콘텐츠센터).
 
 뉴닉 같은 이메일 뉴스레터는 RSS 가 없고 메인 사이트는 JS 앱이라 스크래핑이 안 되지만,
 Stibee 웹 공유 링크(`https://stibee.com/api/v1.0/emails/share/…`)는 **서버 렌더**라
@@ -8,10 +11,15 @@ Stibee 웹 공유 링크(`https://stibee.com/api/v1.0/emails/share/…`)는 **�
 extract.py 의 기본 추출(`include_tables=False`)로는 본문이 얇게 나온다. 그래서
 표(table)를 포함해 추출하고, 그래도 얇으면 태그를 전부 걷어내는 폴백을 쓴다.
 
+출처(source)는 페이지에서 추론한다: og:site_name → 제목 꼬리표("… | AhnLab") → 도메인.
+알려진 호스트(스티비=뉴닉)는 표로 덮어쓴다.
+
 반환 dict 는 다른 수집기와 동일: { title, link, description, pub_date, source, body }.
-(body 는 뉴스레터 전용 추가 키 — 호출부가 save_article_body 로 캐시한다.)
+(body 는 이 경로 전용 추가 키 — 호출부가 save_article_body 로 캐시한다.)
 """
 import re
+from datetime import date as _date
+from urllib.parse import urlparse
 
 import httpx
 
@@ -24,7 +32,13 @@ except Exception:  # pragma: no cover
 
 _UA = "Mozilla/5.0"  # 짧은 UA (rss.py/extract.py 와 동일 정책)
 _MAX_CHARS = 12000   # 뉴스레터는 장문 → 넉넉히. 프롬프트(_article_block)엔 본문 제한 없음
-_SOURCE = "뉴닉"     # 현재 지원 대상(뉴닉 뉴스레터)
+_FALLBACK_SOURCE = "링크"  # 출처를 못 알아냈을 때
+
+# 호스트에 이 문자열이 들어가면 표시명을 강제한다(공유 링크는 og:site_name 이 없거나
+# 발송 플랫폼 이름이라 도메인/메타로는 원래 매체를 알 수 없다).
+_KNOWN_HOSTS = {
+    "stibee.com": "뉴닉",
+}
 
 # 본문 뒤에 붙는 스티비/뉴닉 공통 푸터 시작 마커(기사 본문엔 나올 일 없는 문자열).
 # 이 중 가장 먼저 등장하는 위치에서 본문을 자른다.
@@ -46,6 +60,14 @@ _OG_TITLE_RE = re.compile(
     re.IGNORECASE | re.DOTALL,
 )
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
+_OG_SITE_RE = re.compile(
+    r'<meta[^>]+(?:property|name)=["\']og:site_name["\'][^>]+'
+    r'content=(?P<q>["\'])(?P<val>.*?)(?P=q)',
+    re.IGNORECASE | re.DOTALL,
+)
+# 제목 꼬리표: "본문 제목 | AhnLab", "본문 제목 - 조선일보" 처럼 끝에 붙는 사이트명.
+# 구분자 뒤가 25자 이하일 때만 꼬리표로 본다(제목 자체에 '-' 가 있는 경우 오탐 방지).
+_TITLE_TAIL_RE = re.compile(r"^(?P<head>.+?)\s*[|｜–—-]\s*(?P<tail>[^|｜]{1,25})\s*$")
 
 
 class NewsletterError(RuntimeError):
@@ -88,23 +110,76 @@ def _parse_title(html: str) -> str:
     return "뉴스레터"
 
 
+def _norm(s: str) -> str:
+    """출처 비교용 정규화(공백 제거 + 소문자). 'Ahn Lab' 과 'ahnlab' 을 같게 본다."""
+    return re.sub(r"\s+", "", s or "").lower()
+
+
+def _resolve_source(html: str, url: str, title: str) -> str:
+    """기사 카드에 표시할 출처명을 추론한다.
+
+    우선순위: 알려진 호스트 → og:site_name → 제목 꼬리표("… | AhnLab") → 도메인.
+    """
+    host = (urlparse(url).netloc or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    for known, label in _KNOWN_HOSTS.items():
+        if known in host:
+            return label
+
+    m = _OG_SITE_RE.search(html)
+    if m:
+        site = _clean(m.group("val")).strip()
+        if site:
+            return site
+
+    m = _TITLE_TAIL_RE.match(title or "")
+    if m:
+        tail = m.group("tail").strip()
+        # 꼬리표가 도메인과 겹치면(ahnlab.com ↔ AhnLab) 확실한 사이트명이다.
+        # 겹치지 않아도 짧은 꼬리표는 대개 매체명이므로 채택한다.
+        if tail:
+            return tail
+
+    return host or _FALLBACK_SOURCE
+
+
+def _strip_title_tail(title: str, source: str) -> str:
+    """제목 끝의 사이트명 꼬리표를 제거한다(출처와 일치할 때만).
+
+    "미토스란 무엇인가 | AhnLab" → "미토스란 무엇인가".
+    출처와 다른 꼬리표(부제 등)는 제목의 일부일 수 있으므로 건드리지 않는다.
+    """
+    m = _TITLE_TAIL_RE.match(title or "")
+    if not m:
+        return title
+    head, tail = m.group("head").strip(), m.group("tail").strip()
+    if head and _norm(tail) == _norm(source):
+        return head
+    return title
+
+
 def _parse_pub_date(*texts: str) -> str:
     """텍스트(제목/원문 HTML)에서 발행일을 찾아 ISO8601(+09:00)로 반환(없으면 "").
 
     뉴닉 공유 페이지는 발행일(예: 2026.07.16)이 문서 앞부분에 먼저 나오고, 회사
-    등록일·저작권연도 등은 뒤(푸터)에 있으므로 **첫 매칭**이 발행일이다.
+    등록일·저작권연도 등은 뒤(푸터)에 있으므로 **처음 나오는 유효한 날짜**가 발행일이다.
     db._article_date 가 ISO 를 파싱하므로 발행일 기준 날짜 분류가 그대로 된다.
+
+    유효성 검사가 필수다: 이미지 경로 같은 URL 조각이 날짜처럼 매칭된다
+    (보안뉴스 예: '.../2026/08/54...' → 8월 54일). 실제 달력에 있는 날짜가
+    나올 때까지 다음 매칭으로 넘어간다.
     """
     for t in texts:
         if not t:
             continue
-        m = _DATE_RE.search(t)
-        if m:
+        for m in _DATE_RE.finditer(t):
             y, mo, d = (int(x) for x in m.groups())
             try:
-                return f"{y:04d}-{mo:02d}-{d:02d}T00:00:00+09:00"
+                _date(y, mo, d)  # 존재하지 않는 날짜면 ValueError
             except ValueError:
                 continue
+            return f"{y:04d}-{mo:02d}-{d:02d}T00:00:00+09:00"
     return ""
 
 
@@ -164,19 +239,22 @@ def _extract_body(html: str) -> str:
 
 
 def fetch_newsletter(url: str) -> dict:
-    """뉴스레터 공유 링크에서 기사 dict 를 만든다.
+    """웹 링크(기사·뉴스레터 공유 링크 등)에서 기사 dict 를 만든다.
 
     반환: { title, link, description, pub_date, source, body }
     실패(다운로드/본문 없음) 시 NewsletterError.
     """
     if not url:
-        raise NewsletterError("뉴스레터 링크가 비어 있습니다.")
+        raise NewsletterError("링크가 비어 있습니다.")
     html = _download(url)
     title = _parse_title(html)
+    source = _resolve_source(html, url, title)
+    title = _strip_title_tail(title, source)
     body = _extract_body(html)
     if not body:
         raise NewsletterError(
-            "뉴스레터 본문을 추출하지 못했습니다. 본문 텍스트를 직접 붙여넣어 보세요."
+            "본문을 추출하지 못했습니다(자바스크립트로 그리는 페이지일 수 있습니다). "
+            "본문 텍스트를 직접 붙여넣어 보세요."
         )
     # 발행일: 제목에 없으면 원문 HTML 앞부분의 첫 날짜(=발행일)를 쓴다.
     pub_date = _parse_pub_date(title, html)
@@ -188,6 +266,6 @@ def fetch_newsletter(url: str) -> dict:
         "link": url,
         "description": description,
         "pub_date": pub_date,  # 없으면 저장 시 오늘로 fallback
-        "source": _SOURCE,
+        "source": source,
         "body": body,
     }

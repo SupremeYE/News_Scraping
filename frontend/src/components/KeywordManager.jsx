@@ -63,7 +63,7 @@ export default function KeywordManager({
   const placeholder = isYoutube
     ? "유튜브 링크를 붙여넣으면 자막을 자동으로 가져옵니다. (자동이 안 되면 자막을 복사해 아래에 함께 붙여넣어도 됩니다)"
     : isNewsletter
-    ? "뉴닉 공유 링크(stibee)를 붙여넣으세요. 링크가 없으면 본문 전체를 붙여넣어도 됩니다."
+    ? "기사 링크를 붙여넣으세요(뉴스레터 공유 링크 포함). 본문이 안 잡히면 본문 전체를 붙여넣어도 됩니다."
     : isBoannews
     ? "보안뉴스에서 검색할 키워드 예: 취약점, 랜섬웨어…"
     : isRss
@@ -83,7 +83,7 @@ export default function KeywordManager({
           title="출처 선택"
         >
           <option value="naver">네이버</option>
-          <option value="newsletter">뉴닉 뉴스레터</option>
+          <option value="newsletter">링크 저장</option>
           <option value="youtube">유튜브 영상</option>
           <option value="boannews">보안뉴스 검색</option>
           {presets.map((p) => (
@@ -115,8 +115,8 @@ export default function KeywordManager({
         </button>
       </form>
       <p className="add-hint">
-        <b>네이버</b>는 여러 매체에서 검색, <b>뉴닉 뉴스레터</b>는 공유 링크(또는 본문)를
-        붙여넣어 저장, <b>유튜브 영상</b>은 링크만 붙여넣으면 자막을 자동으로 받아 학습,
+        <b>네이버</b>는 여러 매체에서 검색, <b>링크 저장</b>은 아무 기사 링크나 붙여넣어
+        저장(출처는 자동 인식), <b>유튜브 영상</b>은 링크만 붙여넣으면 자막을 자동으로 받아 학습,
         <b>보안뉴스 검색</b>은 보안뉴스 최근 기사에서 키워드 매칭, <b>RSS</b>는 그 매체의
         최신 헤드라인 수집입니다. 키워드마다 별도 블럭으로 쌓입니다.
       </p>
@@ -136,7 +136,7 @@ export default function KeywordManager({
               k.kind === "boannews"
                 ? `${k.source_label || "보안뉴스"} 검색`
                 : isNews
-                ? "뉴스레터"
+                ? "저장"
                 : isVid
                 ? "유튜브"
                 : `${k.source_label || "RSS"} RSS`;

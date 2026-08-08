@@ -242,25 +242,27 @@ def create_keyword(payload: KeywordIn):
     return {"keyword": row, "created": created, "new_count": new_count, "warning": warning}
 
 
-NEWSLETTER_CHANNEL = "뉴닉"  # 뉴스레터 이슈들을 담는 컨테이너 채널 표시명
+# 저장한 링크들을 담는 컨테이너 채널 표시명. 매체별로 채널을 쪼개면 1건짜리 패널이
+# 잔뜩 생기므로 한 패널에 모으고, 매체명은 기사별 source(카드에 표시)로 구분한다.
+LINK_CHANNEL = "링크"
 
 
 @app.post("/api/newsletter")
 def add_newsletter(payload: NewsletterIn):
-    """뉴스레터 이슈 1건을 기사로 저장한다.
+    """웹 링크 1건을 기사로 저장한다(뉴스레터 공유 링크 포함).
 
-    - url(공유 링크)이면 fetch_newsletter 로 본문 자동 추출.
-    - text(붙여넣기)면 그 텍스트를 본문으로 사용(추출 실패 대비 폴백).
+    - url 이면 fetch_newsletter 로 제목/출처/발행일/본문 자동 추출.
+    - text(붙여넣기)면 그 텍스트를 본문으로 사용(JS 페이지 등 추출 실패 대비 폴백).
     저장 후 그 기사의 발행일/id 를 돌려줘 프론트가 해당 발행일로 이동하게 한다.
     """
     url = (payload.url or "").strip()
     text = (payload.text or "").strip()
     if not url and not text:
-        raise HTTPException(status_code=400, detail="뉴스레터 링크(URL) 또는 본문 텍스트를 입력하세요.")
+        raise HTTPException(status_code=400, detail="링크(URL) 또는 본문 텍스트를 입력하세요.")
 
-    # 뉴스레터 컨테이너 채널을 find-or-create(이미 있으면 재사용).
+    # 링크 컨테이너 채널을 find-or-create(이미 있으면 재사용).
     channel, _ = db.add_keyword(
-        NEWSLETTER_CHANNEL, kind="newsletter", source_label=NEWSLETTER_CHANNEL
+        LINK_CHANNEL, kind="newsletter", source_label=LINK_CHANNEL
     )
 
     if url and url.lower().startswith("http"):
@@ -273,14 +275,14 @@ def add_newsletter(payload: NewsletterIn):
     else:
         # 붙여넣기 경로: 본문 텍스트만으로 기사 구성. 링크는 (제목+오늘)로 합성해 중복만 방지.
         body = text or url
-        title = (payload.title or "").strip() or (body.splitlines()[0][:80] if body else "뉴닉 뉴스레터")
+        title = (payload.title or "").strip() or (body.splitlines()[0][:80] if body else LINK_CHANNEL)
         today = date.today().isoformat()
         article = {
             "title": title,
-            "link": f"newsletter://{NEWSLETTER_CHANNEL}/{today}/{title}",
+            "link": f"link://{LINK_CHANNEL}/{today}/{title}",
             "description": body[:200].replace("\n", " ").strip(),
             "pub_date": today,
-            "source": NEWSLETTER_CHANNEL,
+            "source": LINK_CHANNEL,
             "body": body,
         }
 

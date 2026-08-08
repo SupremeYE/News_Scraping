@@ -97,12 +97,13 @@ export default function App() {
       const isUrl = /^https?:\/\//i.test(term);
       const res = await api.addNewsletter(isUrl ? { url: term } : { text: value });
       setBanner(null);
-      // 뉴스레터는 발행일로 백필되므로, 그 발행일로 이동해 카드가 바로 보이게 한다.
+      // 저장한 링크는 (오늘이 아니라) 원문 발행일로 분류되므로, 그 날짜로 이동해
+      // 카드가 바로 보이게 한다. 안 그러면 "최근" 화면에선 안 보일 수 있다.
       const d = res.article?.article_date || "recent";
       setSelectedDate(d);
       await refreshAll(d);
       showToast(
-        res.article ? `뉴스레터 추가 · ${res.article.title}` : "뉴스레터 추가됨"
+        res.article ? `링크 저장 · ${res.article.title}` : "링크 저장됨"
       );
     } catch (err) {
       setBanner(err.message);
