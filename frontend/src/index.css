@@ -1465,7 +1465,7 @@ button {
   .study-body {
     padding-bottom: calc(26px + env(safe-area-inset-bottom));
   }
-  /* 탭 6개가 줄바꿈되면 헤더가 3줄이 된다 → 가로 스크롤 한 줄로 */
+  /* 섹션 탭 + 질문하기/내 노트가 줄바꿈되면 헤더가 3줄이 된다 → 가로 스크롤 한 줄로 */
   .study-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;

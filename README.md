@@ -153,7 +153,7 @@ npm run dev                        # http://localhost:5173 (/api 는 :8000 으�
 | GET | `/api/dashboard` | **최근** 모아보기(기본). `?date=YYYY-MM-DD` 로 특정 발행일만 |
 | GET | `/api/dates` | 뉴스가 있는 발행일 목록 |
 | POST | `/api/update` | 지금 즉시 전체 재수집. 네이버 키가 없어도 RSS·보안뉴스는 수집됨 |
-| GET·POST | `/api/articles/{id}/study` | 기사 AI 해설 조회 / 생성(4섹션, 캐시) |
+| GET·POST | `/api/articles/{id}/study` | 기사 AI 해설 조회 / 생성(5섹션, 캐시) |
 | GET | `/api/articles/{id}/prompt` | 복사용 프롬프트(키 없이 쓰는 무료 경로) |
 | POST | `/api/articles/{id}/ask` | 기사에 대한 자유 질문(Q&A) |
 | GET·POST·DELETE | `/api/glossary` | 용어장 조회 / 추가 / 삭제 |

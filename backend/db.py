@@ -115,7 +115,8 @@ def init_db():
             conn.execute("ALTER TABLE articles ADD COLUMN body TEXT")
 
         # ---------- 학습(스터디) 레이어 ----------
-        # article_study: 기사별 AI 해설 캐시. section ∈ summary|terms|context|meaning.
+        # article_study: 기사별 AI 해설 캐시. section 은 llm.SECTION_ORDER 의 키
+        #   (summary|terms|context|critique|meaning) — 행으로 저장하므로 섹션 추가에 마이그레이션 불필요.
         #   재열람 시 즉시 반환(비용 절약), force 로 재생성. 기사 삭제 시 함께 삭제.
         conn.execute(
             """

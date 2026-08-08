@@ -3,16 +3,18 @@ import * as api from "../api.js";
 import { renderNoteBody } from "../note.jsx";
 
 // 뉴스 카드 클릭 시 열리는 AI 스터디 모달.
-// - 4개 섹션(핵심요약/용어풀이/맥락·연결/나에게의 의미) 해설을 생성/열람(캐시)
+// - 섹션별 해설을 생성/열람(캐시). 섹션 목록은 서버(GET /api/study/sections)가 정한다.
 // - 자유 질문 Q&A
 // - 하이브리드: API 키가 없으면 "프롬프트 복사"로 구독 챗에 붙여넣는 무료 경로
 // - 용어장 저장 / 스터디 노트 저장(축적)
 
-const ORDER_FALLBACK = ["summary", "terms", "context", "meaning"];
+// 서버에서 섹션 메타를 못 받았을 때만 쓰는 폴백. 백엔드 SECTION_ORDER 와 맞춰둘 것.
+const ORDER_FALLBACK = ["summary", "terms", "context", "critique", "meaning"];
 const LABEL_FALLBACK = {
   summary: "핵심 요약",
   terms: "용어 풀이",
   context: "맥락·연결",
+  critique: "짚어볼 점",
   meaning: "나에게의 의미",
 };
 
@@ -113,7 +115,7 @@ export default function StudyPanel({
   const generateAll = useCallback(async () => {
     const missing = order.filter((s) => !study[s]);
     if (missing.length === 0) {
-      onToast("이미 4개 해설이 모두 생성돼 있어요");
+      onToast(`이미 ${order.length}개 해설이 모두 생성돼 있어요`);
       return;
     }
     setLoading((l) => Object.fromEntries(missing.map((s) => [s, true])));

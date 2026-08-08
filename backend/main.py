@@ -385,7 +385,7 @@ def _today() -> str:
 # ---------- 학습(스터디) 레이어 ----------
 
 class StudyIn(BaseModel):
-    sections: list[str] | None = None  # 없으면 4개 전부
+    sections: list[str] | None = None  # 없으면 전 섹션
     force: bool = False                # True 면 캐시 무시하고 재생성
 
 
@@ -401,7 +401,7 @@ class TermIn(BaseModel):
 
 
 class TermsImportIn(BaseModel):
-    text: str = ""                    # GPT 응답(용어 섹션 또는 4섹션 전체) 붙여넣기
+    text: str = ""                    # GPT 응답(용어 섹션 또는 전체 응답) 붙여넣기
     article_id: int | None = None     # 어느 기사에서 나온 용어인지(선택)
     only_new: bool = False            # True 면 이미 담긴 용어는 건너뜀(설명 덮어쓰기 방지)
 

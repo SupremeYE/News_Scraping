@@ -1,10 +1,14 @@
 """LLM 스터디 해설 계층 — 프로바이더-무관 얇은 래퍼.
 
-기사(제목+요약)를 받아 학습용 해설 4종을 생성한다:
-  - summary : 핵심 요약(무엇을/왜/그래서)
-  - terms   : 어려운 용어 풀이 + 예시(JSON 배열)
-  - context : 배경·맥락·연결
-  - meaning : 나에게의 의미(경제 문해력/커리어/투자)
+기사(제목+요약)를 받아 학습용 해설을 생성한다(SECTION_ORDER 순):
+  - summary  : 핵심 요약(무엇을/왜/그래서)
+  - terms    : 어려운 용어 풀이 + 예시(JSON 배열)
+  - context  : 배경·맥락·연결
+  - critique : 짚어볼 점(한계·부작용/다른 입장/기사만으론 모르는 것)
+  - meaning  : 나에게의 의미(경제 문해력/커리어/투자)
+
+섹션 추가는 SECTIONS + SECTION_ORDER + ALL_INSTRUCTION 세 곳만 손대면 된다
+(엔드포인트·DB·프론트 탭은 이 상수를 순회하므로 자동 반영).
 
 기본 프로바이더는 OpenAI(신규 SDK 없이 httpx 로 직접 호출). LLM_PROVIDER env 로
 분기 가능하게 구성해 두어, 나중에 Anthropic(Claude) 등으로 스왑하기 쉽다.
@@ -72,6 +76,17 @@ SECTIONS = {
             "각 항목 2~3문장."
         ),
     },
+    "critique": {
+        "label": "짚어볼 점",
+        "instruction": (
+            "이 뉴스를 비판적으로 따져보게 도와줘.\n"
+            "1) 여기서 말하는 조치·주장이 뜻대로 안 될 수 있는 이유(한계나 부작용)\n"
+            "2) 다른 입장이나 이해관계자는 이걸 어떻게 볼지\n"
+            "3) 이 기사만으로는 알 수 없는 것 — 빠진 정보나 조심해서 읽어야 할 표현\n"
+            "각 항목 2~3문장. 단정하지 말고 '~할 수 있다' 수준으로 쓰고, "
+            "기사에 없는 사실을 지어내지 마."
+        ),
+    },
     "meaning": {
         "label": "나에게의 의미",
         "instruction": (
@@ -86,7 +101,7 @@ SECTIONS = {
     },
 }
 
-SECTION_ORDER = ["summary", "terms", "context", "meaning"]
+SECTION_ORDER = ["summary", "terms", "context", "critique", "meaning"]
 
 SYSTEM_PROMPT = (
     "너는 뉴스를 초심자에게 쉽게 풀어주는 학습 도우미다. "
@@ -156,7 +171,7 @@ def _copy_instruction(section: str) -> str:
 def build_copy_prompt(article: dict, section: str = "all") -> str:
     """무료 경로용 '복사 프롬프트'. 구독 챗(ChatGPT/Claude)에 붙여넣어 쓴다.
 
-    section='all' 이면 4개 섹션 지시를 한 번에 담는다. 사람이 읽는 용도라
+    section='all' 이면 전 섹션 지시를 한 번에 담는다. 사람이 읽는 용도라
     용어 풀이도 JSON 대신 읽기 좋은 목록으로 요청한다.
     """
     block = _article_block(article)
@@ -164,7 +179,7 @@ def build_copy_prompt(article: dict, section: str = "all") -> str:
         lines = [
             SYSTEM_PROMPT,
             "",
-            "다음 뉴스를 아래 4가지 관점에서 설명해줘.",
+            f"다음 뉴스를 아래 {len(SECTION_ORDER)}가지 관점에서 설명해줘.",
             "",
             block,
             "",
@@ -252,18 +267,20 @@ def run_section(article: dict, section: str) -> str:
     return content
 
 
-## ---------- 통합 호출(4섹션 1회) ----------
-# "전체 해설"을 한 번의 호출로 처리해 본문(최대 4000자)을 4번 반복 입력하지 않게 한다.
+## ---------- 통합 호출(전 섹션 1회) ----------
+# "전체 해설"을 한 번의 호출로 처리해 본문(최대 4000자)을 섹션 수만큼 반복 입력하지 않게 한다.
 # 응답은 아래 JSON 객체 하나. terms 만 배열(카드 렌더용), 나머지는 문자열.
+# 섹션을 추가할 때 아래 형식에도 키를 넣어야 한다(빠지면 그 섹션만 개별 호출로 폴백).
 
 ALL_INSTRUCTION = (
-    "위 뉴스를 아래 4가지 관점에서 설명하고, 반드시 JSON 객체 하나로만 답해라. "
+    f"위 뉴스를 아래 {len(SECTION_ORDER)}가지 관점에서 설명하고, 반드시 JSON 객체 하나로만 답해라. "
     "코드블록(```)이나 다른 설명 문장 없이 순수 JSON만 출력해.\n"
     "형식:\n"
     "{\n"
     '  "summary": "무엇을 / 왜·배경 / 그래서 왜 중요한가를 각각 한 문장씩, 줄바꿈(\\n)으로 구분한 3줄",\n'
     '  "terms": [{"term":"용어","explanation":"초심자용 쉬운 설명","example":"일상적인 예시"}],\n'
     '  "context": "1) 왜 지금 벌어졌나 2) 무엇과 연결되나 3) 앞으로 볼 것 — 각 2~3문장",\n'
+    '  "critique": "1) 한계·부작용 2) 다른 입장에서는 3) 기사만으로 알 수 없는 것 — 각 2~3문장",\n'
     '  "meaning": "1) 이 분야에서 알아둘 핵심 2) 커리어·실무 시사점 3) (경제·산업 관련일 때만) 투자 참고 — 각 2~3문장"\n'
     "}\n"
     "terms 는 최대 5개. 특정 종목 추천이나 단정적 투자 조언은 피하고 '참고' 수준으로."
@@ -271,7 +288,7 @@ ALL_INSTRUCTION = (
 
 
 def build_all_messages(article: dict):
-    """통합(4섹션) 호출용 메시지."""
+    """통합(전 섹션) 호출용 메시지."""
     user = f"{_article_block(article)}\n\n[요청]\n{ALL_INSTRUCTION}"
     return SYSTEM_PROMPT, user
 
@@ -299,7 +316,7 @@ def _parse_all(raw: str) -> dict:
 
 
 def run_all_sections(article: dict) -> dict:
-    """1회 호출로 4섹션을 생성해 { section: content } 로 반환(terms 는 JSON 문자열).
+    """1회 호출로 전 섹션을 생성해 { section: content } 로 반환(terms 는 JSON 문자열).
 
     파싱 실패/자격증명 문제는 예외로 올려 호출부가 섹션별 방식으로 폴백하게 한다.
     """
@@ -346,7 +363,9 @@ def _normalize_terms(content: str) -> str:
 
 _TERMS_HEADER_RE = re.compile(r"용어\s*풀이")
 # '용어 풀이' 다음에 오는 다른 섹션 헤더(여기서 용어 섹션이 끝난다)
-_OTHER_SECTION_RE = re.compile(r"(핵심\s*요약|맥락|나에게|의미|시사)")
+# ('짚어볼' 처럼 충분히 특이한 말만 넣을 것. '문제'·'한계' 같은 흔한 단어를 넣으면
+#  용어 설명 줄에 우연히 걸려 용어 구간이 조기 종료된다.)
+_OTHER_SECTION_RE = re.compile(r"(핵심\s*요약|맥락|나에게|의미|시사|짚어볼)")
 # 선행 불릿/번호 1개 제거. '*' 불릿은 벗기되 '**'(굵게)는 보존.
 _LEAD_RE = re.compile(r"^[>\s]*(?:[-–—•·■◆▪●]|\*(?!\*)|\d{1,2}[.)])\s+")
 _BOLD_TERM_RE = re.compile(r"^\*\*(.+?)\*\*\s*[:：\-–]\s*(.+)$")
@@ -365,7 +384,7 @@ def _split_example(rest: str):
 
 
 def parse_terms_text(text: str) -> list:
-    """복사 경로 GPT 응답(용어 섹션 또는 4섹션 전체)에서 용어를 파싱.
+    """복사 경로 GPT 응답(용어 섹션 또는 전체 응답)에서 용어를 파싱.
 
     반환: [{ term, explanation, example }] (중복 term 제거).
     - '용어 풀이' 헤더가 있으면 그 섹션(다음 섹션 헤더 전까지)만 대상 → 굵게 없는
