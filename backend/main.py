@@ -400,12 +400,14 @@ class TermIn(BaseModel):
     explanation: str | None = None
     example: str | None = None
     article_id: int | None = None
+    # 사용자가 직접 타이핑해 넣는 경로(학습 노트의 용어 직접추가 폼)에서만 True.
+    # AI 가 만든 설명("+용어장")은 기존 항목을 덮어쓰지 않는다.
+    overwrite: bool = False
 
 
 class TermsImportIn(BaseModel):
     text: str = ""                    # GPT 응답(용어 섹션 또는 전체 응답) 붙여넣기
     article_id: int | None = None     # 어느 기사에서 나온 용어인지(선택)
-    only_new: bool = False            # True 면 이미 담긴 용어는 건너뜀(설명 덮어쓰기 방지)
 
 
 class NoteIn(BaseModel):
@@ -544,10 +546,15 @@ def get_glossary(q: str | None = None):
 
 @app.post("/api/glossary")
 def add_term(payload: TermIn):
+    """용어 1개 저장. 반환에 created(새로 담겼는지)를 실어 프론트가 안내를 구분한다."""
     term = (payload.term or "").strip()
     if not term:
         raise HTTPException(status_code=400, detail="용어를 입력하세요.")
-    return db.upsert_term(term, payload.explanation, payload.example, payload.article_id)
+    row, created = db.save_term(
+        term, payload.explanation, payload.example, payload.article_id,
+        overwrite=payload.overwrite,
+    )
+    return {**row, "created": created}
 
 
 @app.post("/api/glossary/parse")
@@ -568,21 +575,28 @@ def parse_terms(payload: TermsImportIn):
 
 @app.post("/api/glossary/import")
 def import_terms(payload: TermsImportIn):
-    """붙여넣은 GPT 응답(복사 경로)에서 용어를 파싱해 용어장에 일괄 저장한다."""
+    """붙여넣은 GPT 응답(복사 경로)에서 용어를 파싱해 용어장에 일괄 저장한다.
+
+    **이미 담긴 용어는 건너뛴다**(덮어쓰지 않음). 사용자가 다듬어 둔 설명을 잃지
+    않기 위한 것 — 자세한 이유는 db.save_term 주석 참고. 건너뛴 수도 함께 돌려줘
+    프론트가 "N개 담김 · M개는 이미 있음" 으로 안내한다.
+    """
     parsed = llm.parse_terms_text(payload.text or "")
     if not parsed:
         raise HTTPException(
             status_code=422,
             detail="용어를 찾지 못했습니다. GPT 응답의 '용어 풀이' 부분을 붙여넣어 주세요.",
         )
-    if payload.only_new:
-        have = db.existing_terms([t["term"] for t in parsed])
-        parsed = [t for t in parsed if t["term"].strip().lower() not in have]
-    saved = [
-        db.upsert_term(t["term"], t.get("explanation"), t.get("example"), payload.article_id)
-        for t in parsed
-    ]
-    return {"count": len(saved), "terms": saved}
+    saved, skipped = [], 0
+    for t in parsed:
+        row, created = db.save_term(
+            t["term"], t.get("explanation"), t.get("example"), payload.article_id
+        )
+        if created:
+            saved.append(row)
+        else:
+            skipped += 1
+    return {"count": len(saved), "skipped": skipped, "terms": saved}
 
 
 @app.delete("/api/glossary/{term_id}")

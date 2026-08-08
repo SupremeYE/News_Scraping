@@ -444,28 +444,35 @@ def list_glossary(query: str = None) -> list:
         return [dict(r) for r in rows]
 
 
-def upsert_term(term: str, explanation: str = None, example: str = None,
-                article_id: int = None) -> dict:
-    """용어를 용어장에 추가/갱신(term 기준). 저장된 행을 반환."""
+def save_term(term: str, explanation: str = None, example: str = None,
+              article_id: int = None, overwrite: bool = False) -> tuple:
+    """용어를 용어장에 저장. 반환 (저장된 행, 새로 만들었는지).
+
+    overwrite=False(기본)면 **이미 있는 용어는 건드리지 않는다.** 사용자가 다듬어 둔
+    설명을 AI 생성 텍스트가 조용히 덮어쓰는 사고를 막기 위한 것 — 덮어쓰기는 되돌릴
+    수 없고 사라진 줄도 모르는 반면, 건너뛰어서 잃는 건 '조금 더 나을 수도 있는 설명'
+    뿐이다. overwrite=True 는 사용자가 직접 타이핑해 넣는 경로에서만 쓴다.
+    """
     term = (term or "").strip()
     with get_conn() as conn:
-        conn.execute(
-            """
-            INSERT INTO glossary (term, explanation, example, article_id)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(term)
-            DO UPDATE SET explanation = excluded.explanation,
-                          example = excluded.example,
-                          article_id = COALESCE(excluded.article_id, glossary.article_id)
-            """,
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO glossary (term, explanation, example, article_id) "
+            "VALUES (?, ?, ?, ?)",
             (term, explanation, example, article_id),
         )
+        created = cur.rowcount > 0
+        if not created and overwrite:
+            conn.execute(
+                "UPDATE glossary SET explanation = ?, example = ?, "
+                "article_id = COALESCE(?, article_id) WHERE term = ?",
+                (explanation, example, article_id, term),
+            )
         row = conn.execute(
             "SELECT id, term, explanation, example, article_id, created_at "
             "FROM glossary WHERE term = ?",
             (term,),
         ).fetchone()
-        return dict(row)
+        return dict(row), created
 
 
 def existing_terms(terms: list) -> set:

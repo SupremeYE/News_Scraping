@@ -179,10 +179,10 @@ export default function StudyPanel({
     if (!termHint || termHintBusy) return;
     setTermHintBusy(true);
     try {
+      // 이미 있는 용어는 서버가 알아서 건너뛴다(기본 동작).
       const res = await api.importTerms({
         text: termHint.text,
         article_id: articleId,
-        only_new: true,
       });
       onToast(`용어 ${res.count}개를 용어장에 담았습니다 ✓`);
       setTermHint(null);
@@ -219,16 +219,22 @@ export default function StudyPanel({
     [appendBlock, askedQ, answer]
   );
 
+  // AI 가 만든 설명이므로 기존 항목은 덮어쓰지 않는다(overwrite 안 보냄).
+  // 이미 있으면 조용히 넘어가지 말고 그렇다고 알려준다.
   const saveTerm = useCallback(
     async (t) => {
       try {
-        await api.addTerm({
+        const res = await api.addTerm({
           term: t.term,
           explanation: t.explanation,
           example: t.example,
           article_id: articleId,
         });
-        onToast(`'${t.term}' 용어장에 저장됨`);
+        onToast(
+          res.created
+            ? `'${t.term}' 용어장에 저장됨`
+            : `'${t.term}' 은(는) 이미 용어장에 있어요 (설명은 그대로 뒀습니다)`
+        );
         onGlossaryChange && onGlossaryChange();
       } catch (e) {
         setWarning(e.message);
@@ -237,13 +243,18 @@ export default function StudyPanel({
     [articleId, onToast, onGlossaryChange]
   );
 
-  // GPT 응답(복사 경로)을 붙여넣어 용어를 일괄 저장. 성공 건수를 반환.
+  // GPT 응답(복사 경로)을 붙여넣어 용어를 일괄 저장. 담긴 건수를 반환.
+  // 이미 있는 용어는 서버가 건너뛴다(skipped) — 그 사실을 토스트에 같이 보여준다.
   const importTerms = useCallback(
     async (text) => {
       const res = await api.importTerms({ text, article_id: articleId });
-      onToast(`${res.count}개 용어장에 담겼어요`);
+      onToast(
+        res.skipped
+          ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
+          : `${res.count}개 용어장에 담겼어요`
+      );
       onGlossaryChange && onGlossaryChange();
-      return res.count;
+      return res.count + res.skipped; // 0 이면 UI 가 실패로 보므로 처리한 총량을 반환
     },
     [articleId, onToast, onGlossaryChange]
   );

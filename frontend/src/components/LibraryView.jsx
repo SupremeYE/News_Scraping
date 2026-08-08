@@ -66,16 +66,22 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
     if (!term) return;
     setAdding(true);
     try {
-      await api.addTerm({
+      // 직접 타이핑해 넣는 폼이므로 기존 항목을 갱신하는 게 의도한 동작이다.
+      // (AI 가 만든 설명을 담는 "+용어장"/일괄 담기는 반대로 덮어쓰지 않는다.)
+      const res = await api.addTerm({
         term,
         explanation: nExp.trim() || null,
         example: nEx.trim() || null,
+        overwrite: true,
       });
       setNTerm("");
       setNExp("");
       setNEx("");
       await loadTerms(q);
-      onToast && onToast(`'${term}' 용어장에 추가됨`);
+      onToast &&
+        onToast(
+          res.created ? `'${term}' 용어장에 추가됨` : `'${term}' 설명을 갱신했어요`
+        );
     } catch (e) {
       onToast && onToast(e.message || "용어 추가 실패");
     } finally {
@@ -92,7 +98,12 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
       setBulkText("");
       setBulkOpen(false);
       await loadTerms(q);
-      onToast && onToast(`${res.count}개 용어장에 담겼어요`);
+      onToast &&
+        onToast(
+          res.skipped
+            ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
+            : `${res.count}개 용어장에 담겼어요`
+        );
     } catch (e) {
       onToast && onToast(e.message || "용어를 찾지 못했어요");
     } finally {
