@@ -3,6 +3,8 @@
 AI 스터디 해설 품질을 위해 제목+요약(스니펫)만이 아니라 **원문 본문**을 프롬프트에
 넣으려는 용도. 뉴스 사이트마다 HTML 구조가 달라 trafilatura(본문 추출 전문)를 쓰고,
 없거나 실패하면 <p> 태그 정규식 추출로 폴백한다. 최종 실패 시 ""(호출부는 요약으로 폴백).
+
+다운로드는 httpx 로 한다(_download 주석 참고). 본문 추출만 trafilatura 에 맡긴다.
 """
 import re
 
@@ -28,23 +30,47 @@ def _regex_extract(html: str) -> str:
     return "\n".join(parts)
 
 
-def _download(url: str) -> str:
-    """URL 을 받아 HTML 문자열로. trafilatura(인코딩 처리 우수) 우선, 실패 시 httpx."""
-    if trafilatura is not None:
+_META_CHARSET_RE = re.compile(rb'charset\s*=\s*["\']?\s*([\w-]+)', re.IGNORECASE)
+
+
+def _decode(r: "httpx.Response") -> str:
+    """응답 바이트를 문자열로. 헤더에 charset 이 있으면 그걸 따르고,
+    없으면 <meta charset> 을 보고 디코드한다(EUC-KR 국내 매체 대응).
+    """
+    if r.charset_encoding:  # Content-Type 에 charset 명시 → httpx 판단이 정확
+        return r.text
+    m = _META_CHARSET_RE.search(r.content[:4096])
+    if m:
         try:
-            html = trafilatura.fetch_url(url)
-            if html:
-                return html
-        except Exception:
+            return r.content.decode(m.group(1).decode("ascii", "ignore"), errors="replace")
+        except (LookupError, UnicodeDecodeError):
             pass
+    return r.text
+
+
+def _download(url: str) -> str:
+    """URL 을 받아 HTML 문자열로.
+
+    httpx 를 먼저 쓴다. trafilatura.fetch_url 은 인코딩을 자동감지하는데
+    **EUC-KR(보안뉴스 등 국내 매체)을 GBK 로 오판해 한글이 한자로 깨진다**
+    (예: '미토스' → '固配胶'). httpx 는 Content-Type 의 charset 을 그대로
+    따르므로 정확하다. httpx 가 실패할 때만 trafilatura 로 폴백한다.
+    """
     try:
         r = httpx.get(
             url, headers={"User-Agent": _UA}, timeout=10.0, follow_redirects=True
         )
         if r.status_code == 200:
-            return r.text
+            html = _decode(r)
+            if html:
+                return html
     except httpx.RequestError:
         pass
+    if trafilatura is not None:
+        try:
+            return trafilatura.fetch_url(url) or ""
+        except Exception:
+            pass
     return ""
 
 
