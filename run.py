@@ -6,7 +6,14 @@ FastAPI 가 빌드된 프론트(frontend/dist)까지 같은 포트(8000)에서 �
 브라우저 하나만 열면 웹앱이 뜬다.
 
 사용법:
-    python run.py           # 또는 Windows: start.bat 더블클릭
+    python run.py                          # 또는 Windows: start.bat 더블클릭
+    python run.py --quick --no-browser     # 부팅 자동실행용(빠른 기동, 브라우저 안 엶)
+
+옵션:
+    --quick        pip 설치·프론트 빌드를 건너뛰고 이미 빌드된 dist 로 바로 실행.
+                   dist 가 없으면 안전하게 정상 빌드로 되돌아간다.
+                   코드를 고친 뒤에는 옵션 없이 한 번 실행해 dist 를 갱신할 것.
+    --no-browser   서버만 띄우고 브라우저는 열지 않는다.
 
 요구사항: Python 3.10+, Node.js 18+ (프론트 빌드용).
 네이버 API 키는 선택(없어도 RSS·보안뉴스 채널은 동작).
@@ -31,6 +38,9 @@ BACKEND = os.path.join(ROOT, "backend")
 FRONTEND = os.path.join(ROOT, "frontend")
 PORT = int(os.environ.get("PORT", "8000"))
 URL = f"http://localhost:{PORT}"
+
+QUICK = "--quick" in sys.argv          # 설치·빌드 생략(부팅 자동실행용)
+NO_BROWSER = "--no-browser" in sys.argv
 
 
 def info(msg):
@@ -72,22 +82,33 @@ def ensure_env():
 
 
 def main():
-    # 1) 파이썬 의존성
-    info("파이썬 의존성 설치 (backend/requirements.txt)")
-    run([sys.executable, "-m", "pip", "install", "-q", "-r",
-         os.path.join(BACKEND, "requirements.txt")])
+    # --quick: dist 가 이미 있으면 설치·빌드를 통째로 건너뛴다(부팅 시 몇 초 만에 기동).
+    # dist 가 없으면 서버가 프론트를 서빙할 수 없으므로 정상 경로로 되돌아간다.
+    dist = os.path.join(FRONTEND, "dist")
+    quick = QUICK and os.path.isdir(dist)
+    if QUICK and not quick:
+        info("--quick 이지만 frontend/dist 가 없어 정상 빌드로 진행합니다")
 
-    # 2) .env 준비
+    if not quick:
+        # 1) 파이썬 의존성
+        info("파이썬 의존성 설치 (backend/requirements.txt)")
+        run([sys.executable, "-m", "pip", "install", "-q", "-r",
+             os.path.join(BACKEND, "requirements.txt")])
+
+    # 2) .env 준비 (빠르고, 없으면 서버가 못 뜨므로 항상 확인)
     info("환경설정 확인")
     ensure_env()
 
-    # 3) 프론트 빌드 (dist 는 gitignore 라 항상 빌드)
-    info("프론트엔드 빌드")
-    if not os.path.isdir(os.path.join(FRONTEND, "node_modules")):
-        run_npm(["install"], cwd=FRONTEND)
-    run_npm(["run", "build"], cwd=FRONTEND)
-    if not os.path.isdir(os.path.join(FRONTEND, "dist")):
-        die("프론트 빌드 산출물(frontend/dist)이 없습니다. 위 npm 로그를 확인하세요.")
+    if not quick:
+        # 3) 프론트 빌드 (dist 는 gitignore 라 항상 빌드)
+        info("프론트엔드 빌드")
+        if not os.path.isdir(os.path.join(FRONTEND, "node_modules")):
+            run_npm(["install"], cwd=FRONTEND)
+        run_npm(["run", "build"], cwd=FRONTEND)
+        if not os.path.isdir(dist):
+            die("프론트 빌드 산출물(frontend/dist)이 없습니다. 위 npm 로그를 확인하세요.")
+    else:
+        info("빠른 기동(--quick): 설치·빌드를 건너뛰고 기존 빌드를 사용합니다")
 
     # 4) 백엔드 실행 (cwd=backend 필수: .env / news.db 가 상대경로)
     info(f"서버 시작 → {URL}")
@@ -111,10 +132,11 @@ def main():
         except Exception:
             time.sleep(1)
     print(f"\n\033[32m✔ 실행 중: {URL}  (종료: Ctrl+C)\033[0m\n")
-    try:
-        webbrowser.open(URL)
-    except Exception:
-        pass
+    if not NO_BROWSER:
+        try:
+            webbrowser.open(URL)
+        except Exception:
+            pass
 
     # 서버 프로세스가 끝날 때까지 대기
     try:
