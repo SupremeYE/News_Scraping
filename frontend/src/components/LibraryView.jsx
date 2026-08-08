@@ -80,7 +80,8 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
       await loadTerms(q);
       onToast &&
         onToast(
-          res.created ? `'${term}' 용어장에 추가됨` : `'${term}' 설명을 갱신했어요`
+          (res.created ? `'${term}' 용어장에 추가됨` : `'${term}' 설명을 갱신했어요`) +
+            api.similarNote(res.similar)
         );
     } catch (e) {
       onToast && onToast(e.message || "용어 추가 실패");
@@ -98,12 +99,10 @@ export default function LibraryView({ refreshKey, onOpenArticle, onToast }) {
       setBulkText("");
       setBulkOpen(false);
       await loadTerms(q);
-      onToast &&
-        onToast(
-          res.skipped
-            ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
-            : `${res.count}개 용어장에 담겼어요`
-        );
+      const base = res.skipped
+        ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
+        : `${res.count}개 용어장에 담겼어요`;
+      onToast && onToast(base + api.similarNote(res.similar?.[0]?.to));
     } catch (e) {
       onToast && onToast(e.message || "용어를 찾지 못했어요");
     } finally {

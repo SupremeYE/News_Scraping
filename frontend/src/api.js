@@ -97,9 +97,20 @@ export const getGlossary = (q) =>
 export const addTerm = (payload) =>
   req("/glossary", { method: "POST", body: JSON.stringify(payload) });
 
-// GPT 응답(용어 섹션/전체)을 붙여넣어 용어를 일괄 저장. { count, terms }
+// GPT 응답(용어 섹션/전체)을 붙여넣어 용어를 일괄 저장.
+// { count, skipped, terms, similar:[{term, to:[…]}] }
 export const importTerms = (payload) =>
   req("/glossary/import", { method: "POST", body: JSON.stringify(payload) });
+
+// 용어 저장 결과를 토스트 문구로. 세 경로(+용어장 / 일괄 담기 / 직접추가)가
+// 같은 표현을 쓰도록 여기 한 곳에서 만든다.
+// similar = 표기만 다른 기존 용어들(저장은 이미 됐고, 확인만 하라는 안내).
+export const similarNote = (similar) => {
+  if (!similar || !similar.length) return "";
+  const [first, ...rest] = similar;
+  const more = rest.length ? ` 외 ${rest.length}건` : "";
+  return ` · 비슷한 '${first}'${more} 이(가) 이미 있어요`;
+};
 
 // 저장 없이 파싱만(노트 저장 후 담을지 물어보는 용도). { count, new_count, terms }
 export const parseTerms = (payload) =>

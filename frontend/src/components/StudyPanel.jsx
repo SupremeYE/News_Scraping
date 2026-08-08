@@ -232,7 +232,7 @@ export default function StudyPanel({
         });
         onToast(
           res.created
-            ? `'${t.term}' 용어장에 저장됨`
+            ? `'${t.term}' 용어장에 저장됨${api.similarNote(res.similar)}`
             : `'${t.term}' 은(는) 이미 용어장에 있어요 (설명은 그대로 뒀습니다)`
         );
         onGlossaryChange && onGlossaryChange();
@@ -248,11 +248,11 @@ export default function StudyPanel({
   const importTerms = useCallback(
     async (text) => {
       const res = await api.importTerms({ text, article_id: articleId });
-      onToast(
-        res.skipped
-          ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
-          : `${res.count}개 용어장에 담겼어요`
-      );
+      const base = res.skipped
+        ? `${res.count}개 담김 · ${res.skipped}개는 이미 있어 건너뜀`
+        : `${res.count}개 용어장에 담겼어요`;
+      // 표기만 다른 기존 용어가 있으면 첫 건만 짚어준다(토스트가 길어지지 않게).
+      onToast(base + api.similarNote(res.similar?.[0]?.to));
       onGlossaryChange && onGlossaryChange();
       return res.count + res.skipped; // 0 이면 UI 가 실패로 보므로 처리한 총량을 반환
     },

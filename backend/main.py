@@ -546,15 +546,21 @@ def get_glossary(q: str | None = None):
 
 @app.post("/api/glossary")
 def add_term(payload: TermIn):
-    """용어 1개 저장. 반환에 created(새로 담겼는지)를 실어 프론트가 안내를 구분한다."""
+    """용어 1개 저장.
+
+    반환에 created(새로 담겼는지)와 similar(표기만 다른 기존 용어들)를 실어
+    프론트가 안내를 구분한다. similar 가 있어도 저장은 그대로 진행한다 —
+    진짜 다른 개념일 수도 있으므로 판단은 사용자 몫.
+    """
     term = (payload.term or "").strip()
     if not term:
         raise HTTPException(status_code=400, detail="용어를 입력하세요.")
+    similar = db.similar_terms(term)
     row, created = db.save_term(
         term, payload.explanation, payload.example, payload.article_id,
         overwrite=payload.overwrite,
     )
-    return {**row, "created": created}
+    return {**row, "created": created, "similar": similar}
 
 
 @app.post("/api/glossary/parse")
@@ -587,16 +593,25 @@ def import_terms(payload: TermsImportIn):
             status_code=422,
             detail="용어를 찾지 못했습니다. GPT 응답의 '용어 풀이' 부분을 붙여넣어 주세요.",
         )
-    saved, skipped = [], 0
+    saved, skipped, similar = [], 0, []
     for t in parsed:
+        # 저장 전에 봐야 방금 담은 것끼리 서로 걸리지 않는다.
+        near = db.similar_terms(t["term"])
         row, created = db.save_term(
             t["term"], t.get("explanation"), t.get("example"), payload.article_id
         )
         if created:
             saved.append(row)
+            if near:
+                similar.append({"term": row["term"], "to": near})
         else:
             skipped += 1
-    return {"count": len(saved), "skipped": skipped, "terms": saved}
+    return {
+        "count": len(saved),
+        "skipped": skipped,
+        "terms": saved,
+        "similar": similar,  # [{term, to:[비슷한 기존 용어…]}]
+    }
 
 
 @app.delete("/api/glossary/{term_id}")

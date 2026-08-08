@@ -475,6 +475,55 @@ def save_term(term: str, explanation: str = None, example: str = None,
         return dict(row), created
 
 
+_PAREN_RE = re.compile(r"\(([^)]*)\)")
+
+
+def _term_keys(term: str) -> set:
+    """용어 비교용 키 집합. 괄호 밖 본체와 괄호 안 내용(영문 병기)을 각각 키로 본다.
+
+    '취약점(Vulnerability)' → {'취약점', 'vulnerability'}
+    덕분에 '취약점' 이나 'Vulnerability' 로 다시 담아도 같은 개념임을 알아챈다.
+    """
+    t = (term or "").strip()
+    if not t:
+        return set()
+    keys = set()
+    body = re.sub(r"\s+", "", _PAREN_RE.sub("", t)).lower()
+    if body:
+        keys.add(body)
+    for inner in _PAREN_RE.findall(t):
+        k = re.sub(r"\s+", "", inner).lower()
+        if k:
+            keys.add(k)
+    return keys
+
+
+def similar_terms(term: str, limit: int = 3) -> list:
+    """이미 담긴 용어 중 표기만 다르고 같은 개념일 가능성이 큰 것들의 이름을 반환.
+
+    **핵심어 일치만** 본다(위 _term_keys). '취약점' ↔ '취약점(Vulnerability)',
+    'AI Agent' ↔ 'AI 에이전트(AI Agent)' 같은 표기 흔들림을 오탐 없이 잡는다.
+    포함 관계(취약점 ⊂ 제로데이 취약점)까지 보면 '다주택자 양도세 중과' ↔
+    '양도소득세' 처럼 엄연히 다른 개념까지 걸려 경고가 무뎌지므로 일부러 뺐다.
+    (저장을 막는 용도가 아니라 '확인해보라'고 알려주기만 하는 용도.)
+    """
+    keys = _term_keys(term)
+    if not keys:
+        return []
+    exact = (term or "").strip()
+    out = []
+    with get_conn() as conn:
+        for row in conn.execute("SELECT term FROM glossary"):
+            t = row["term"]
+            if t == exact:
+                continue  # 완전일치는 중복제거가 이미 처리
+            if _term_keys(t) & keys:
+                out.append(t)
+                if len(out) >= limit:
+                    break
+    return out
+
+
 def existing_terms(terms: list) -> set:
     """주어진 용어 중 이미 용어장에 있는 것들을 소문자 집합으로 반환.
 
