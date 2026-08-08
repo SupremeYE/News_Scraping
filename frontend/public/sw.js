@@ -10,7 +10,7 @@
  *
  * 캐시 버전을 올리면(VERSION) 이전 캐시는 activate 에서 정리된다.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = "shell-" + VERSION;
 const API_CACHE = "api-" + VERSION;
 const SHELL_ASSETS = [

@@ -740,6 +740,27 @@ button {
   font-size: 13px;
   line-height: 1.5;
 }
+/* 노트 저장 후 "새 용어 N개 담을까요?" 안내 배너 */
+.term-hint {
+  margin: 14px 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--canvas-cream);
+  border: 1px solid var(--hairline);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.term-hint-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .study-prompt-box {
   margin: 14px 24px 0;
 }
@@ -1273,9 +1294,11 @@ button {
 
 /* ---------- 반응형: 태블릿/모바일 ---------- */
 @media (max-width: 768px) {
-  /* 노치·홈 인디케이터를 피해 여백 확보(홈 화면 추가 시 전체화면이 되므로 필수) */
+  /* 노치·홈 인디케이터를 피해 여백 확보(홈 화면 추가 시 전체화면이 되므로 필수).
+     상태바(black-translucent)가 콘텐츠 위에 겹치므로 top 도 안전영역만큼 밀어야 한다. */
   .app {
-    padding: 16px calc(14px + env(safe-area-inset-right))
+    padding: calc(16px + env(safe-area-inset-top))
+      calc(14px + env(safe-area-inset-right))
       calc(48px + env(safe-area-inset-bottom))
       calc(14px + env(safe-area-inset-left));
   }
@@ -1428,11 +1451,13 @@ button {
   .study-tabs,
   .study-body,
   .study-warning,
+  .term-hint,
   .study-prompt-box {
     padding-left: 14px;
     padding-right: 14px;
   }
   .study-warning,
+  .term-hint,
   .study-prompt-box {
     margin-left: 0;
     margin-right: 0;

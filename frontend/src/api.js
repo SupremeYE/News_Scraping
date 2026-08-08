@@ -101,6 +101,10 @@ export const addTerm = (payload) =>
 export const importTerms = (payload) =>
   req("/glossary/import", { method: "POST", body: JSON.stringify(payload) });
 
+// 저장 없이 파싱만(노트 저장 후 담을지 물어보는 용도). { count, new_count, terms }
+export const parseTerms = (payload) =>
+  req("/glossary/parse", { method: "POST", body: JSON.stringify(payload) });
+
 export const deleteTerm = (id) =>
   req(`/glossary/${id}`, { method: "DELETE" });
 

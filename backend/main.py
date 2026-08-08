@@ -403,6 +403,7 @@ class TermIn(BaseModel):
 class TermsImportIn(BaseModel):
     text: str = ""                    # GPT 응답(용어 섹션 또는 4섹션 전체) 붙여넣기
     article_id: int | None = None     # 어느 기사에서 나온 용어인지(선택)
+    only_new: bool = False            # True 면 이미 담긴 용어는 건너뜀(설명 덮어쓰기 방지)
 
 
 class NoteIn(BaseModel):
@@ -547,6 +548,22 @@ def add_term(payload: TermIn):
     return db.upsert_term(term, payload.explanation, payload.example, payload.article_id)
 
 
+@app.post("/api/glossary/parse")
+def parse_terms(payload: TermsImportIn):
+    """저장하지 않고 파싱만 한다(노트 저장 후 '담을까요?' 안내용).
+
+    각 용어에 exists(이미 용어장에 있는지)를 붙여 주고, 새 용어 수를 함께 준다.
+    """
+    parsed = llm.parse_terms_text(payload.text or "")
+    have = db.existing_terms([t["term"] for t in parsed])
+    terms = [{**t, "exists": t["term"].strip().lower() in have} for t in parsed]
+    return {
+        "count": len(terms),
+        "new_count": sum(1 for t in terms if not t["exists"]),
+        "terms": terms,
+    }
+
+
 @app.post("/api/glossary/import")
 def import_terms(payload: TermsImportIn):
     """붙여넣은 GPT 응답(복사 경로)에서 용어를 파싱해 용어장에 일괄 저장한다."""
@@ -556,6 +573,9 @@ def import_terms(payload: TermsImportIn):
             status_code=422,
             detail="용어를 찾지 못했습니다. GPT 응답의 '용어 풀이' 부분을 붙여넣어 주세요.",
         )
+    if payload.only_new:
+        have = db.existing_terms([t["term"] for t in parsed])
+        parsed = [t for t in parsed if t["term"].strip().lower() not in have]
     saved = [
         db.upsert_term(t["term"], t.get("explanation"), t.get("example"), payload.article_id)
         for t in parsed

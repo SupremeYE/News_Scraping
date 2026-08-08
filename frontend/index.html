@@ -17,7 +17,10 @@
     <!-- iOS 홈 화면 추가(standalone 전체화면 + 아이콘 + 상태바) -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- default: 상태바를 콘텐츠 위에 겹치지 않게 한다. black-translucent 는 겹쳐 그리는데,
+         iOS standalone 에서 env(safe-area-inset-top) 이 0 으로 보고되는 경우가 있어
+         제목이 시계·배터리와 겹쳤다. default 면 웹뷰가 상태바 아래에서 시작한다. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="뉴스" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>

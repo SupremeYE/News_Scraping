@@ -467,6 +467,24 @@ def upsert_term(term: str, explanation: str = None, example: str = None,
         return dict(row)
 
 
+def existing_terms(terms: list) -> set:
+    """주어진 용어 중 이미 용어장에 있는 것들을 소문자 집합으로 반환.
+
+    노트에서 파싱한 용어가 '새 것'인지 판별해, 이미 담긴 용어의 설명을
+    (사용자가 손봤을 수 있으므로) 덮어쓰지 않기 위해 쓴다.
+    """
+    names = [t.strip() for t in (terms or []) if t and t.strip()]
+    if not names:
+        return set()
+    with get_conn() as conn:
+        placeholders = ",".join("?" * len(names))
+        rows = conn.execute(
+            f"SELECT term FROM glossary WHERE term COLLATE NOCASE IN ({placeholders})",
+            names,
+        ).fetchall()
+        return {r["term"].strip().lower() for r in rows}
+
+
 def delete_term(term_id: int) -> bool:
     with get_conn() as conn:
         cur = conn.execute("DELETE FROM glossary WHERE id = ?", (term_id,))

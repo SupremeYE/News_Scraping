@@ -49,6 +49,9 @@ export default function StudyPanel({
   const [noteSaved, setNoteSaved] = useState(false); // 저장 직후 "완료!" 표시(잠깐)
   const [notePreviewOn, setNotePreviewOn] = useState(false);
   const noteDirty = useRef(false); // 사용자가 노트를 편집했는지(비동기 로드 덮어쓰기 방지)
+  // 노트 저장 직후 "새 용어 N개 담을까요?" 안내. { count, text } | null
+  const [termHint, setTermHint] = useState(null);
+  const [termHintBusy, setTermHintBusy] = useState(false);
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
@@ -65,6 +68,7 @@ export default function StudyPanel({
     setPromptText(null);
     setAnswer(null);
     setQuestion("");
+    setTermHint(null);
     setTab(order[0]);
     noteDirty.current = false; // 새 기사: 편집 플래그 리셋
     api
@@ -151,6 +155,14 @@ export default function StudyPanel({
         onToast("저장되었습니다 ✓");
         setNoteSaved(true);
         setTimeout(() => setNoteSaved(false), 1800);
+        // 노트 본문에 아직 용어장에 없는 용어가 있으면 담을지 물어본다.
+        // (자동 저장하지 않는 이유: 파서가 엉뚱한 줄을 용어로 볼 수 있어서.)
+        try {
+          const r = await api.parseTerms({ text: body });
+          setTermHint(r?.new_count > 0 ? { count: r.new_count, text: body } : null);
+        } catch {
+          setTermHint(null); // 파싱 실패는 노트 저장과 무관하므로 조용히 넘어간다.
+        }
       } catch (e) {
         setWarning(e.message);
       } finally {
@@ -159,6 +171,26 @@ export default function StudyPanel({
     },
     [articleId, onToast]
   );
+
+  // 안내 배너에서 "용어장에 담기": 이미 있는 용어는 건드리지 않는다(only_new).
+  const importNewTermsFromNote = useCallback(async () => {
+    if (!termHint || termHintBusy) return;
+    setTermHintBusy(true);
+    try {
+      const res = await api.importTerms({
+        text: termHint.text,
+        article_id: articleId,
+        only_new: true,
+      });
+      onToast(`용어 ${res.count}개를 용어장에 담았습니다 ✓`);
+      setTermHint(null);
+      onGlossaryChange && onGlossaryChange();
+    } catch (e) {
+      setWarning(e.message);
+    } finally {
+      setTermHintBusy(false);
+    }
+  }, [termHint, termHintBusy, articleId, onToast, onGlossaryChange]);
 
   // 제목(heading) + 내용을 노트에 이어 붙여 저장(섹션/Q&A 공용).
   const appendBlock = useCallback(
@@ -310,6 +342,28 @@ export default function StudyPanel({
         </div>
 
         {warning && <div className="study-warning">{warning}</div>}
+
+        {/* 노트 저장 후 새 용어 안내. 섹션/Q&A 저장에서도 뜨도록 탭 바깥에 둔다. */}
+        {termHint && (
+          <div className="term-hint">
+            <span className="term-hint-text">
+              이 노트에서 아직 담지 않은 용어 <b>{termHint.count}개</b>를
+              찾았어요.
+            </span>
+            <div className="term-hint-actions">
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={importNewTermsFromNote}
+                disabled={termHintBusy}
+              >
+                {termHintBusy ? "담는 중…" : "용어장에 담기"}
+              </button>
+              <button className="btn btn-sm" onClick={() => setTermHint(null)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
 
         {promptText && (
           <div className="study-prompt-box">
