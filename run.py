@@ -14,6 +14,9 @@ FastAPI 가 빌드된 프론트(frontend/dist)까지 같은 포트(8000)에서 �
                    dist 가 없으면 안전하게 정상 빌드로 되돌아간다.
                    코드를 고친 뒤에는 옵션 없이 한 번 실행해 dist 를 갱신할 것.
     --no-browser   서버만 띄우고 브라우저는 열지 않는다.
+    --allow-sleep  절전 방지를 끈다(기본은 켜짐 → keepawake.py 참고).
+                   서버가 도는 동안 PC 가 잠들면 밖에서 접속이 끊기므로,
+                   AC 전원일 때는 기본으로 시스템 절전을 막는다(화면은 그대로 꺼짐).
 
 요구사항: Python 3.10+, Node.js 18+ (프론트 빌드용).
 네이버 API 키는 선택(없어도 RSS·보안뉴스 채널은 동작).
@@ -25,6 +28,8 @@ import sys
 import time
 import urllib.request
 import webbrowser
+
+import keepawake
 
 # Windows 기본 콘솔(cp949)에서 한글·기호 출력 시 UnicodeEncodeError 방지.
 for _stream in (sys.stdout, sys.stderr):
@@ -41,6 +46,7 @@ URL = f"http://localhost:{PORT}"
 
 QUICK = "--quick" in sys.argv          # 설치·빌드 생략(부팅 자동실행용)
 NO_BROWSER = "--no-browser" in sys.argv
+ALLOW_SLEEP = "--allow-sleep" in sys.argv  # 절전 방지 해제
 
 
 def info(msg):
@@ -138,12 +144,21 @@ def main():
         except Exception:
             pass
 
+    # 6) 절전 방지 (밖에서 언제든 접속되려면 PC 가 깨어 있어야 함)
+    keeper = None if ALLOW_SLEEP else keepawake.start()
+    if keeper:
+        print("  · 절전 방지 켜짐 — AC 전원일 때 시스템이 잠들지 않습니다"
+              "(화면은 평소대로 꺼짐 / 배터리로 바뀌면 자동 해제).")
+
     # 서버 프로세스가 끝날 때까지 대기
     try:
         proc.wait()
     except KeyboardInterrupt:
         print("\n종료 중…")
         proc.terminate()
+    finally:
+        if keeper:
+            keeper.stop()
 
 
 if __name__ == "__main__":
